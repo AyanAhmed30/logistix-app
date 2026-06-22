@@ -30,8 +30,19 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
-.env*.local
+# Local env & secrets (never commit real keys)
+.env
+.env.*
+!.env.example
+supabase/.env
+supabase/.env.*
+
+# Credentials & signing keys
+credentials.json
+google-services.json
+GoogleService-Info.plist
+*.secret
+*.credentials
 
 # typescript
 *.tsbuildinfo
