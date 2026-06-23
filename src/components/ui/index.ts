@@ -1,3 +1,4 @@
+export { InquiryListItem } from './InquiryListItem';
 export { Avatar } from './Avatar';
 export { Badge, StatusBadge } from './Badge';
 export { Button } from './Button';

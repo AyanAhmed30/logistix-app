@@ -7,6 +7,7 @@ import { Button, ProgressBar, TextInput } from '@/components/ui';
 import { useSignupFlow } from '@/hooks/useSignupFlow';
 import { AUTH_ROUTES } from '@/navigation/routes';
 import { completeRegistrationFlow } from '@/services/registration';
+import { probeSupabaseConnection } from '@/services/supabase';
 import { getAuthErrorMessage } from '@/utils/auth-errors';
 import { colors, typography } from '@/constants/theme';
 import {
@@ -33,6 +34,7 @@ export function SignupWizardScreen() {
   const [fieldError, setFieldError] = useState<string | undefined>();
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [connectionChecked, setConnectionChecked] = useState(false);
 
   const currentStep = SIGNUP_WIZARD_STEPS[stepIndex];
   const isLastStep = stepIndex === SIGNUP_WIZARD_STEPS.length - 1;
@@ -43,6 +45,25 @@ export function SignupWizardScreen() {
       router.replace(AUTH_ROUTES.signup);
     }
   }, [phone, router]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    probeSupabaseConnection().then((result) => {
+      if (!mounted) {
+        return;
+      }
+
+      setConnectionChecked(true);
+      if (!result.ok) {
+        setFormError(getAuthErrorMessage(result.error));
+      }
+    });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const updateField = (step: SignupWizardStep, value: string) => {
     setFormValues((prev) => ({ ...prev, [step]: value }));
@@ -214,6 +235,7 @@ export function SignupWizardScreen() {
               fullWidth
               size="lg"
               loading={isSubmitting}
+              disabled={!connectionChecked}
               onPress={handleSubmit}
             />
           ) : (

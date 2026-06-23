@@ -1,4 +1,9 @@
-import 'react-native-get-random-values';
+import { Platform } from 'react-native';
+
+if (Platform.OS !== 'web') {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  require('react-native-get-random-values');
+}
 
 import bcrypt from 'bcryptjs';
 

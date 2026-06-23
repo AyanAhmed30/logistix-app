@@ -1,9 +1,34 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Tabs } from 'expo-router';
+import { Redirect, Tabs, useRouter } from 'expo-router';
+import { useEffect } from 'react';
+import { ActivityIndicator, View } from 'react-native';
 
 import { colors } from '@/constants/theme';
+import { AUTH_ROUTES } from '@/navigation/routes';
+import { useAuth } from '@/providers';
 
 export default function TabLayout() {
+  const { user, isLoading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isLoading && !user) {
+      router.replace(AUTH_ROUTES.login);
+    }
+  }, [isLoading, router, user]);
+
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  if (!user) {
+    return <Redirect href={AUTH_ROUTES.login} />;
+  }
+
   return (
     <Tabs
       screenOptions={{
@@ -28,6 +53,15 @@ export default function TabLayout() {
           title: 'Home',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="grid-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="inquiries"
+        options={{
+          title: 'Inquiries',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="document-text-outline" size={size} color={color} />
           ),
         }}
       />

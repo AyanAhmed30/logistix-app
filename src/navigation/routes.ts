@@ -7,4 +7,9 @@ export const AUTH_ROUTES = {
   welcome: '/(auth)/welcome',
 } as const;
 
+export const APP_ROUTES = {
+  tabs: '/(tabs)',
+  inquiries: '/(tabs)/inquiries',
+} as const;
+
 export type AuthRoute = (typeof AUTH_ROUTES)[keyof typeof AUTH_ROUTES];

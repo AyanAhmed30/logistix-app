@@ -1,4 +1,10 @@
-import 'react-native-get-random-values';
+import { Platform } from 'react-native';
+
+if (Platform.OS !== 'web') {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  require('react-native-get-random-values');
+}
+
 import 'react-native-gesture-handler';
 
 import { Stack } from 'expo-router';
@@ -11,6 +17,7 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(tabs)" />
       </Stack>
     </AppProviders>
   );

@@ -1,6 +1,6 @@
 import { PostgrestError } from '@supabase/supabase-js';
 
-import { getSupabase, isSupabaseConfigured } from '@/services/supabase';
+import { getSupabase, isSupabaseConfigured, probeSupabaseConnection } from '@/services/supabase';
 import { AppUser } from '@/types/auth';
 import { hashPassword, verifyPassword } from '@/utils/password';
 
@@ -42,6 +42,12 @@ function toUser(row: PublicUserRow): AppUser {
 
 function toError(error: unknown): Error {
   if (error instanceof Error) {
+    const message = error.message.toLowerCase();
+    if (message.includes('failed to fetch') || message.includes('network request failed')) {
+      return new Error(
+        'network_request_failed: Unable to reach Supabase from this device. Check your internet connection, disable browser ad blockers for localhost, and confirm EXPO_PUBLIC_SUPABASE_URL in .env is correct.',
+      );
+    }
     return error;
   }
   return new Error('An unexpected error occurred.');
@@ -90,19 +96,24 @@ function mapDatabaseError(error: PostgrestError | Error): Error {
 
 async function findExistingUser(phone: string, email: string): Promise<'phone' | 'email' | null> {
   const client = getSupabase();
+  const normalizedEmail = email.trim().toLowerCase();
 
-  const { data: phoneMatch } = await client.from('users').select('id').eq('phone', phone).maybeSingle();
-  if (phoneMatch) {
-    return 'phone';
+  const [phoneResult, emailResult] = await Promise.all([
+    client.from('users').select('id').eq('phone', phone).maybeSingle(),
+    client.from('users').select('id').eq('email', normalizedEmail).maybeSingle(),
+  ]);
+
+  if (phoneResult.error) {
+    throw mapDatabaseError(phoneResult.error);
+  }
+  if (emailResult.error) {
+    throw mapDatabaseError(emailResult.error);
   }
 
-  const { data: emailMatch } = await client
-    .from('users')
-    .select('id')
-    .eq('email', email.trim().toLowerCase())
-    .maybeSingle();
-
-  if (emailMatch) {
+  if (phoneResult.data) {
+    return 'phone';
+  }
+  if (emailResult.data) {
     return 'email';
   }
 
@@ -135,6 +146,11 @@ export async function registerUser(params: {
           'Supabase is not configured. Add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY to .env.',
         ),
       };
+    }
+
+    const connection = await probeSupabaseConnection();
+    if (!connection.ok) {
+      return { data: null, error: connection.error };
     }
 
     const existing = await findExistingUser(params.phone, normalizedEmail);
@@ -198,6 +214,11 @@ export async function loginUser(
           'Supabase is not configured. Add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY to .env.',
         ),
       };
+    }
+
+    const connection = await probeSupabaseConnection();
+    if (!connection.ok) {
+      return { data: null, error: connection.error };
     }
 
     const { data, error } = await getSupabase()

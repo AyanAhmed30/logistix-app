@@ -1,33 +1,43 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Avatar, Button, MenuListItem, ScreenContainer } from '@/components/ui';
-import { mockProfileSections, mockUser } from '@/data/mock/profile';
+import { mockProfileSections } from '@/data/mock/profile';
 import { colors, radius, spacing, typography } from '@/constants/theme';
+import { AUTH_ROUTES } from '@/navigation/routes';
+import { useAuth } from '@/providers';
 
-/**
- * Profile Screen
- *
- * Purpose: Account hub — user identity, settings navigation, and sign-out affordance.
- * Menu items are visual only with placeholder press handlers.
- */
+function getInitials(firstName?: string, lastName?: string): string {
+  const first = firstName?.trim().charAt(0) ?? '';
+  const last = lastName?.trim().charAt(0) ?? '';
+  const initials = `${first}${last}`.toUpperCase();
+  return initials || 'U';
+}
+
 export default function ProfileScreen() {
+  const router = useRouter();
+  const { user, signOut } = useAuth();
+
   const handleMenuPress = (_id: string) => {
     // UI placeholder
   };
 
-  const handleSignOut = () => {
-    // UI placeholder — no auth logic
+  const handleSignOut = async () => {
+    await signOut();
+    router.replace(AUTH_ROUTES.home);
   };
+
+  const displayName = user ? `${user.firstName} ${user.lastName}`.trim() : 'User';
 
   return (
     <ScreenContainer title="Profile" subtitle="Manage your account">
       <View style={styles.profileCard}>
-        <Avatar initials={mockUser.avatarInitials} size="lg" />
+        <Avatar initials={getInitials(user?.firstName, user?.lastName)} size="lg" />
         <View style={styles.profileInfo}>
-          <Text style={styles.name}>{mockUser.name}</Text>
-          <Text style={styles.role}>{mockUser.role}</Text>
-          <Text style={styles.company}>{mockUser.company}</Text>
+          <Text style={styles.name}>{displayName}</Text>
+          <Text style={styles.role}>Customer</Text>
+          <Text style={styles.company}>{user?.phone ?? ''}</Text>
         </View>
         <View style={styles.editBtn}>
           <Ionicons name="create-outline" size={20} color={colors.primary} />
@@ -36,7 +46,7 @@ export default function ProfileScreen() {
 
       <View style={styles.emailCard}>
         <Ionicons name="mail-outline" size={18} color={colors.textMuted} />
-        <Text style={styles.email}>{mockUser.email}</Text>
+        <Text style={styles.email}>{user?.email ?? '—'}</Text>
       </View>
 
       {mockProfileSections.map((section) => (

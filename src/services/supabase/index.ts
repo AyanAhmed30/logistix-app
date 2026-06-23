@@ -1,1 +1,1 @@
-export { getSupabase, isSupabaseConfigured } from './client';
+export { getSupabase, isSupabaseConfigured, probeSupabaseConnection } from './client';

@@ -29,8 +29,8 @@ export function getAuthErrorMessage(error: unknown): string {
   if (lower.includes('supabase is not configured')) {
     return 'Missing Supabase config. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY in .env, then restart Expo.';
   }
-  if (lower === 'typeerror: failed to fetch' || lower.includes('err_internet_disconnected')) {
-    return 'No internet connection. Connect to the internet and try again.';
+  if (lower.includes('network_request_failed') || lower === 'typeerror: failed to fetch' || lower.includes('failed to fetch') || lower.includes('err_internet_disconnected')) {
+    return 'Cannot reach the server. Check your internet connection, disable ad blockers for this page, verify .env Supabase settings, then restart Expo and try again.';
   }
 
   if (message) {

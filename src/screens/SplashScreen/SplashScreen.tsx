@@ -1,10 +1,10 @@
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 
 import { PlaceholderLogo } from '@/components/auth';
 import { APP_NAME } from '@/constants';
-import { AUTH_ROUTES } from '@/navigation/routes';
+import { AUTH_ROUTES, APP_ROUTES } from '@/navigation/routes';
 import { useAuth } from '@/providers';
 import { colors, spacing, typography } from '@/constants/theme';
 
@@ -41,7 +41,7 @@ export function SplashScreen() {
     }
 
     const timer = setTimeout(() => {
-      router.replace(user ? AUTH_ROUTES.welcome : AUTH_ROUTES.home);
+      router.replace((user ? APP_ROUTES.inquiries : AUTH_ROUTES.home) as Href);
     }, SPLASH_DURATION_MS);
 
     return () => clearTimeout(timer);

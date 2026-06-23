@@ -1,12 +1,12 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AuthScreenLayout, ErrorBanner, PlaceholderLogo } from '@/components/auth';
 import { Button, TextInput } from '@/components/ui';
-import { AUTH_ROUTES } from '@/navigation/routes';
+import { AUTH_ROUTES, APP_ROUTES } from '@/navigation/routes';
 import { useAuth } from '@/providers';
 import { loginUser } from '@/services/auth';
 import { getAuthErrorMessage } from '@/utils/auth-errors';
@@ -39,7 +39,7 @@ export function LoginScreen() {
     }
 
     await signIn(result.data);
-    router.replace(AUTH_ROUTES.welcome);
+    router.replace(APP_ROUTES.inquiries as Href);
   };
 
   return (
