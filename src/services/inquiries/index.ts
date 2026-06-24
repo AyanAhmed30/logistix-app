@@ -1,1 +1,1 @@
-export { fetchCustomerPortalByPhone, type CustomerPortalResult } from './customer-portal';
+export { fetchCustomerPortalByUserId, fetchCustomerPortalByPhone, type CustomerPortalResult } from './customer-portal';

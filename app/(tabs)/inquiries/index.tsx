@@ -5,10 +5,11 @@ import { EmptyState, InquiryListItem, ScreenContainer } from '@/components/ui';
 import { colors, radius, spacing, typography } from '@/constants/theme';
 import { useCustomerPortal } from '@/hooks/useCustomerPortal';
 import { useAuth } from '@/providers';
+import { getPortalErrorMessage } from '@/utils/inquiry-portal-errors';
 
 export default function InquiriesScreen() {
   const { user } = useAuth();
-  const { data, isLoading, isError, error, refetch, isRefetching } = useCustomerPortal(user?.phone);
+  const { data, isLoading, isError, error, refetch, isRefetching } = useCustomerPortal(user?.id);
 
   const leadSummary = useMemo(() => {
     if (!data?.leads.length) {
@@ -19,7 +20,6 @@ export default function InquiriesScreen() {
     return {
       name: primaryLead.name,
       leadNumber: primaryLead.leadNumber,
-      status: primaryLead.status,
       totalLeads: data.leads.length,
     };
   }, [data?.leads]);
@@ -28,6 +28,7 @@ export default function InquiriesScreen() {
 
   return (
     <ScreenContainer
+      scrollable={false}
       title="My Inquiries"
       subtitle={
         leadSummary
@@ -44,7 +45,7 @@ export default function InquiriesScreen() {
         <EmptyState
           icon="alert-circle-outline"
           title="Unable to load inquiries"
-          description={error instanceof Error ? error.message : 'Please try again later.'}
+          description={getPortalErrorMessage(error)}
           actionLabel="Retry"
           onActionPress={() => refetch()}
         />
@@ -62,7 +63,6 @@ export default function InquiriesScreen() {
               <Text style={styles.leadName}>{leadSummary.name || 'Customer'}</Text>
               <View style={styles.leadMetaRow}>
                 <Text style={styles.leadMeta}>Lead #{leadSummary.leadNumber ?? '—'}</Text>
-                <Text style={styles.leadMeta}>Status: {leadSummary.status}</Text>
               </View>
               {leadSummary.totalLeads > 1 ? (
                 <Text style={styles.leadNote}>
