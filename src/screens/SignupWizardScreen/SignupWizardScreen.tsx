@@ -1,8 +1,8 @@
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { AuthScreenLayout, ErrorBanner } from '@/components/auth';
+import { AuthFooterLink, AuthScreenLayout, ErrorBanner } from '@/components/auth';
 import { Button, ProgressBar, TextInput } from '@/components/ui';
 import { useSignupFlow } from '@/hooks/useSignupFlow';
 import { AUTH_ROUTES } from '@/navigation/routes';
@@ -35,13 +35,14 @@ export function SignupWizardScreen() {
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [connectionChecked, setConnectionChecked] = useState(false);
+  const signupCompletedRef = useRef(false);
 
   const currentStep = SIGNUP_WIZARD_STEPS[stepIndex];
   const isLastStep = stepIndex === SIGNUP_WIZARD_STEPS.length - 1;
   const progress = Math.round(((stepIndex + 1) / SIGNUP_WIZARD_STEPS.length) * 100);
 
   useEffect(() => {
-    if (!phone) {
+    if (!phone && !signupCompletedRef.current) {
       router.replace(AUTH_ROUTES.signup);
     }
   }, [phone, router]);
@@ -111,7 +112,7 @@ export function SignupWizardScreen() {
   };
 
   const handleSubmit = async () => {
-    if (!validateCurrentStep()) {
+    if (!validateCurrentStep() || isSubmitting) {
       return;
     }
 
@@ -126,13 +127,13 @@ export function SignupWizardScreen() {
       password: formValues.password,
     });
 
-    setIsSubmitting(false);
-
     if (!result.success || result.error) {
+      setIsSubmitting(false);
       setFormError(getAuthErrorMessage(result.error));
       return;
     }
 
+    signupCompletedRef.current = true;
     resetSignupFlow();
     router.replace(AUTH_ROUTES.login);
   };
@@ -213,6 +214,13 @@ export function SignupWizardScreen() {
     <AuthScreenLayout
       title="Create your account"
       subtitle={`Step ${stepIndex + 1} of ${SIGNUP_WIZARD_STEPS.length}: ${signupWizardStepLabels[currentStep]}`}
+      footer={
+        <AuthFooterLink
+          prompt="Already have an account?"
+          linkLabel="Login"
+          onPress={() => router.replace(AUTH_ROUTES.login)}
+        />
+      }
     >
       <View style={styles.progressWrap}>
         <ProgressBar

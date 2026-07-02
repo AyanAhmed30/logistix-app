@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { BenefitItem, PlaceholderLogo } from '@/components/auth';
+import { AppLogo, BenefitItem } from '@/components/auth';
 import { Button } from '@/components/ui';
 import { APP_NAME } from '@/constants';
 import { AUTH_ROUTES } from '@/navigation/routes';
@@ -15,7 +15,7 @@ export function HomeScreen() {
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <PlaceholderLogo size="sm" />
+          <AppLogo size="sm" />
           <View style={styles.headerActions}>
             <Button
               label="Login"

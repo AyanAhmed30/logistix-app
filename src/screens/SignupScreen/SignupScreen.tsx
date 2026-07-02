@@ -4,7 +4,7 @@ import { Controller, useForm } from 'react-hook-form';
 import { StyleSheet, View } from 'react-native';
 import { z } from 'zod';
 
-import { AuthScreenLayout } from '@/components/auth';
+import { AuthFooterLink, AuthScreenLayout } from '@/components/auth';
 import { Button, TextInput } from '@/components/ui';
 import { useSignupFlow } from '@/hooks/useSignupFlow';
 import { AUTH_ROUTES } from '@/navigation/routes';
@@ -39,6 +39,13 @@ export function SignupScreen() {
     <AuthScreenLayout
       title="Create your account"
       subtitle="Enter your phone number to get started."
+      footer={
+        <AuthFooterLink
+          prompt="Already have an account?"
+          linkLabel="Login"
+          onPress={() => router.push(AUTH_ROUTES.login)}
+        />
+      }
     >
       <View style={styles.form}>
         <Controller

@@ -28,12 +28,6 @@ export function InquiryProductDetails({ inquiry, children }: InquiryProductDetai
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Product information</Text>
         <DetailRow icon="cube-outline" label="Product name" value={displayValue(inquiry.productName)} />
-        <DetailRow
-          icon="document-text-outline"
-          label="Description"
-          value={displayValue(inquiry.description)}
-          multiline
-        />
         <DetailRow icon="layers-outline" label="Quantity" value={displayValue(inquiry.quantity)} />
         <DetailRow icon="barbell-outline" label="Total weight" value={displayValue(inquiry.totalWeight)} />
         <DetailRow icon="resize-outline" label="Total CBM" value={displayValue(inquiry.cbm)} />

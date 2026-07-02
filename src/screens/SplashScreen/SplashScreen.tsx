@@ -2,8 +2,7 @@ import { useRouter, type Href } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 
-import { PlaceholderLogo } from '@/components/auth';
-import { APP_NAME } from '@/constants';
+import { AppLogo } from '@/components/auth';
 import { AUTH_ROUTES, APP_ROUTES } from '@/navigation/routes';
 import { useAuth } from '@/providers';
 import { colors, spacing, typography } from '@/constants/theme';
@@ -49,14 +48,13 @@ export function SplashScreen() {
 
   return (
     <View style={styles.container}>
-      <PlaceholderLogo size="lg" animated />
+      <AppLogo size="lg" />
       <Animated.View
         style={{
           opacity: taglineOpacity,
           transform: [{ translateY: taglineTranslate }],
         }}
       >
-        <Text style={styles.appName}>{APP_NAME}</Text>
         <Text style={styles.tagline}>Logistics at your fingertips</Text>
       </Animated.View>
     </View>

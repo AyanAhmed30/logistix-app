@@ -2,16 +2,15 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter, type Href } from 'expo-router';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
-import { AuthScreenLayout, ErrorBanner, PlaceholderLogo } from '@/components/auth';
+import { AuthFooterLink, AuthScreenLayout, ErrorBanner } from '@/components/auth';
 import { Button, TextInput } from '@/components/ui';
 import { AUTH_ROUTES, APP_ROUTES } from '@/navigation/routes';
 import { useAuth } from '@/providers';
 import { loginUser } from '@/services/auth';
 import { getAuthErrorMessage } from '@/utils/auth-errors';
 import { LoginFormValues, loginSchema, normalizePhoneNumber } from '@/utils/validation';
-import { colors, spacing, typography } from '@/constants/theme';
 
 export function LoginScreen() {
   const router = useRouter();
@@ -47,18 +46,13 @@ export function LoginScreen() {
       title="Welcome back"
       subtitle="Sign in with your phone number and password."
       footer={
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>Don&apos;t have an account?</Text>
-          <Pressable accessibilityRole="button" onPress={() => router.push(AUTH_ROUTES.signup)}>
-            <Text style={styles.footerLink}>Create account</Text>
-          </Pressable>
-        </View>
+        <AuthFooterLink
+          prompt="Don't have an account?"
+          linkLabel="Create Account"
+          onPress={() => router.push(AUTH_ROUTES.signup)}
+        />
       }
     >
-      <View style={styles.logoWrap}>
-        <PlaceholderLogo size="sm" />
-      </View>
-
       {formError ? <ErrorBanner message={formError} /> : null}
 
       <View style={styles.form}>
@@ -110,24 +104,7 @@ export function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  logoWrap: {
-    alignItems: 'center',
-  },
   form: {
     gap: 16,
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  footerText: {
-    ...typography.bodySmall,
-    color: colors.textSecondary,
-  },
-  footerLink: {
-    ...typography.label,
-    color: colors.primary,
   },
 });
