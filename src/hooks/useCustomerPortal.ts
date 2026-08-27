@@ -2,21 +2,21 @@ import { useQuery } from '@tanstack/react-query';
 import { useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
 
-import { fetchCustomerPortalByUserId } from '@/services/inquiries';
+import { fetchCustomerPortalBySession } from '@/services/inquiries';
 import { CustomerPortalData } from '@/types/inquiry';
 
 const EMPTY_PORTAL: CustomerPortalData = { leads: [], inquiries: [] };
 
-export function useCustomerPortal(userId: string | undefined) {
+export function useCustomerPortal(sessionToken: string | undefined | null) {
   const query = useQuery({
-    queryKey: ['customer-portal', userId],
-    enabled: Boolean(userId),
+    queryKey: ['customer-portal', sessionToken],
+    enabled: Boolean(sessionToken),
     queryFn: async () => {
-      if (!userId) {
+      if (!sessionToken) {
         return EMPTY_PORTAL;
       }
 
-      const result = await fetchCustomerPortalByUserId(userId);
+      const result = await fetchCustomerPortalBySession(sessionToken);
 
       if (result.error) {
         throw result.error;
@@ -29,10 +29,10 @@ export function useCustomerPortal(userId: string | undefined) {
 
   useFocusEffect(
     useCallback(() => {
-      if (userId) {
+      if (sessionToken) {
         void query.refetch();
       }
-    }, [query.refetch, userId]),
+    }, [query.refetch, sessionToken]),
   );
 
   return query;

@@ -1,5 +1,12 @@
 import { ReactNode } from 'react';
-import { ScrollView, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import {
+  RefreshControlProps,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  ViewStyle,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors, spacing, typography } from '@/constants/theme';
@@ -12,6 +19,7 @@ type ScreenContainerProps = {
   scrollable?: boolean;
   headerRight?: ReactNode;
   edges?: ('top' | 'bottom' | 'left' | 'right')[];
+  refreshControl?: React.ReactElement<RefreshControlProps>;
 };
 
 export function ScreenContainer({
@@ -22,8 +30,9 @@ export function ScreenContainer({
   scrollable = true,
   headerRight,
   edges = ['top'],
+  refreshControl,
 }: ScreenContainerProps) {
-  const hasHeader = title || subtitle || headerRight;
+  const hasHeader = Boolean(title || subtitle || headerRight);
 
   const content = scrollable ? (
     <ScrollView
@@ -31,6 +40,7 @@ export function ScreenContainer({
       contentContainerStyle={[styles.scrollContent, style]}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
+      refreshControl={refreshControl}
     >
       {children}
     </ScrollView>
@@ -69,6 +79,7 @@ const styles = StyleSheet.create({
   },
   headerText: {
     flex: 1,
+    paddingRight: spacing.md,
   },
   title: {
     ...typography.h1,

@@ -91,10 +91,17 @@ export async function probeSupabaseConnection(): Promise<{ ok: true } | { ok: fa
       };
     }
 
-    const { error } = await getSupabase().from('users').select('id').limit(1).maybeSingle();
+    const { error } = await getSupabase().rpc('auth_ping');
 
     if (error) {
-      return { ok: false, error: new Error(error.message || 'Database request failed.') };
+      return {
+        ok: false,
+        error: new Error(
+          error.message?.includes('auth_ping')
+            ? 'database_access_denied: Run supabase/migrations/014_identity_hardening_sessions.sql in Supabase SQL Editor.'
+            : error.message || 'Database request failed.',
+        ),
+      };
     }
 
     return { ok: true };

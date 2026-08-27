@@ -23,8 +23,23 @@ export function getAuthErrorMessage(error: unknown): string {
   if (lower.includes('weak_password') || lower.includes('password hashing failed')) {
     return 'Could not secure your password. Please try again.';
   }
+  if (lower.includes('invalid_session')) {
+    return 'Your session expired. Please sign in again.';
+  }
+  if (lower.includes('invalid_reset_token')) {
+    return 'Reset failed. Check that your phone and email match your account, then try again.';
+  }
+  if (lower.includes('password_unchanged')) {
+    return 'Choose a new password that is different from your current one.';
+  }
+  if (lower.includes('invalid_email')) {
+    return 'Enter a valid email address.';
+  }
+  if (lower.includes('invalid_name')) {
+    return 'Enter a valid first and last name.';
+  }
   if (lower.includes('database_access_denied') || lower.includes('row-level security')) {
-    return 'Database permissions are not set up. Run supabase/migrations/008_direct_users_access.sql in Supabase SQL Editor.';
+    return 'Database permissions are not set up. Run supabase/migrations/014 and 015 in Supabase SQL Editor.';
   }
   if (lower.includes('supabase is not configured')) {
     return 'Missing Supabase config. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY in .env, then restart Expo.';

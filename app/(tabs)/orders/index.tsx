@@ -1,33 +1,46 @@
+import { useRouter, type Href } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import {
   EmptyState,
+  FadeIn,
   FilterChips,
   OrderListItem,
   ScreenContainer,
   SearchBar,
 } from '@/components/ui';
-import { mockOrders } from '@/data/mock/orders';
 import { colors, spacing, typography } from '@/constants/theme';
-import { OrderStatus } from '@/types/ui';
+import { mockCustomer, mockOrders } from '@/data/mock/customer';
+import { APP_ROUTES } from '@/navigation/routes';
+import { Order, OrderStatus } from '@/types/ui';
 
 const filterChips = [
   { id: 'all', label: 'All' },
   { id: 'pending', label: 'Pending' },
-  { id: 'processing', label: 'Processing' },
-  { id: 'in_transit', label: 'In Transit' },
-  { id: 'delivered', label: 'Delivered' },
+  { id: 'processing', label: 'At warehouse' },
+  { id: 'in_transit', label: 'In transit' },
+  { id: 'delivered', label: 'Completed' },
   { id: 'cancelled', label: 'Cancelled' },
 ];
 
-/**
- * Orders Screen
- *
- * Purpose: Searchable, filterable list of shipments for operations teams.
- * Demonstrates list UI patterns with mock order data — no API calls.
- */
+function toListOrder(order: (typeof mockOrders)[number]): Order {
+  return {
+    id: order.id,
+    reference: order.reference,
+    customer: order.productName,
+    origin: order.origin,
+    destination: order.destination,
+    status: order.status,
+    items: order.cartons,
+    weight: order.weight,
+    estimatedDelivery: order.estimatedDelivery,
+    createdAt: order.createdAt,
+  };
+}
+
 export default function OrdersScreen() {
+  const router = useRouter();
   const [search, setSearch] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('all');
 
@@ -35,42 +48,40 @@ export default function OrdersScreen() {
     return mockOrders.filter((order) => {
       const matchesFilter =
         selectedFilter === 'all' || order.status === (selectedFilter as OrderStatus);
-      const query = search.toLowerCase();
+      const query = search.toLowerCase().trim();
       const matchesSearch =
         !query ||
         order.reference.toLowerCase().includes(query) ||
-        order.customer.toLowerCase().includes(query) ||
+        order.productName.toLowerCase().includes(query) ||
         order.origin.toLowerCase().includes(query) ||
-        order.destination.toLowerCase().includes(query);
+        order.destination.toLowerCase().includes(query) ||
+        order.shippingMark.toLowerCase().includes(query);
       return matchesFilter && matchesSearch;
     });
   }, [search, selectedFilter]);
 
-  const handleOrderPress = (_id: string) => {
-    // UI placeholder
-  };
-
   return (
-    <ScreenContainer title="Orders" subtitle={`${mockOrders.length} total shipments`}>
+    <ScreenContainer
+      title="Orders"
+      subtitle={`${mockOrders.length} shipments · ${mockCustomer.companyName}`}
+    >
       <SearchBar
         value={search}
         onChangeText={setSearch}
-        placeholder="Search by reference, customer, or location..."
+        placeholder="Search reference, product, or mark…"
       />
 
       <FilterChips chips={filterChips} selectedId={selectedFilter} onSelect={setSelectedFilter} />
 
-      <View style={styles.resultRow}>
-        <Text style={styles.resultCount}>
-          {filteredOrders.length} result{filteredOrders.length !== 1 ? 's' : ''}
-        </Text>
-      </View>
+      <Text style={styles.resultCount}>
+        {filteredOrders.length} result{filteredOrders.length !== 1 ? 's' : ''}
+      </Text>
 
       {filteredOrders.length === 0 ? (
         <EmptyState
           icon="search-outline"
           title="No orders found"
-          description="Try adjusting your search or filter criteria."
+          description="Try adjusting your search or filter."
           actionLabel="Clear filters"
           onActionPress={() => {
             setSearch('');
@@ -79,12 +90,13 @@ export default function OrdersScreen() {
         />
       ) : (
         <View style={styles.list}>
-          {filteredOrders.map((order) => (
-            <OrderListItem
-              key={order.id}
-              order={order}
-              onPress={() => handleOrderPress(order.id)}
-            />
+          {filteredOrders.map((order, index) => (
+            <FadeIn key={order.id} delay={index * 40}>
+              <OrderListItem
+                order={toListOrder(order)}
+                onPress={() => router.push(APP_ROUTES.orderDetail(order.id) as Href)}
+              />
+            </FadeIn>
           ))}
         </View>
       )}
@@ -93,12 +105,10 @@ export default function OrdersScreen() {
 }
 
 const styles = StyleSheet.create({
-  resultRow: {
-    marginTop: -spacing.sm,
-  },
   resultCount: {
     ...typography.caption,
     color: colors.textMuted,
+    marginTop: -spacing.sm,
   },
   list: {
     gap: spacing.md,

@@ -9,24 +9,24 @@ type StatusConfig = {
 
 export const orderStatusConfig: Record<OrderStatus, StatusConfig> = {
   pending: {
-    label: 'Pending',
+    label: 'Awaiting confirmation',
     backgroundColor: colors.infoLight,
     textColor: colors.info,
   },
   processing: {
-    label: 'Processing',
+    label: 'At warehouse',
     backgroundColor: colors.warningLight,
     textColor: '#B45309',
   },
   in_transit: {
-    label: 'In Transit',
-    backgroundColor: colors.primaryLight,
-    textColor: colors.primary,
+    label: 'In transit',
+    backgroundColor: colors.accentLight,
+    textColor: colors.accentDark,
   },
   delivered: {
-    label: 'Delivered',
+    label: 'Completed',
     backgroundColor: colors.successLight,
-    textColor: '#047857',
+    textColor: colors.success,
   },
   cancelled: {
     label: 'Cancelled',

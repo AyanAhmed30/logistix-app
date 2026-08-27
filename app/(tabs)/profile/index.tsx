@@ -1,26 +1,42 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { useRouter, type Href } from 'expo-router';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 
 import { Avatar, Button, MenuListItem, ScreenContainer } from '@/components/ui';
+import { mockCustomer } from '@/data/mock/customer';
 import { mockProfileSections } from '@/data/mock/profile';
 import { colors, radius, spacing, typography } from '@/constants/theme';
-import { AUTH_ROUTES } from '@/navigation/routes';
+import { APP_ROUTES, AUTH_ROUTES } from '@/navigation/routes';
 import { useAuth } from '@/providers';
 
 function getInitials(firstName?: string, lastName?: string): string {
   const first = firstName?.trim().charAt(0) ?? '';
   const last = lastName?.trim().charAt(0) ?? '';
-  const initials = `${first}${last}`.toUpperCase();
-  return initials || 'U';
+  return `${first}${last}`.toUpperCase() || 'U';
 }
+
+const MENU_ROUTES: Record<string, string> = {
+  notifications: APP_ROUTES.notifications,
+  support: APP_ROUTES.support,
+  security: AUTH_ROUTES.forgotPassword,
+};
 
 export default function ProfileScreen() {
   const router = useRouter();
   const { user, signOut } = useAuth();
 
-  const handleMenuPress = (_id: string) => {
-    // UI placeholder
+  const handleMenuPress = (id: string) => {
+    if (id === 'documents') {
+      Alert.alert(
+        'Documents',
+        'Open any request or order to see quotes, packing lists, and invoices when available.',
+      );
+      return;
+    }
+    const route = MENU_ROUTES[id];
+    if (route) {
+      router.push(route as Href);
+    }
   };
 
   const handleSignOut = async () => {
@@ -28,25 +44,38 @@ export default function ProfileScreen() {
     router.replace(AUTH_ROUTES.home);
   };
 
-  const displayName = user ? `${user.firstName} ${user.lastName}`.trim() : 'User';
+  const displayName = user
+    ? `${user.firstName} ${user.lastName}`.trim()
+    : `${mockCustomer.firstName} ${mockCustomer.lastName}`;
+  const phone = user?.phone ?? mockCustomer.phone;
+  const email = user?.email ?? mockCustomer.email;
 
   return (
-    <ScreenContainer title="Profile" subtitle="Manage your account">
+    <ScreenContainer title="Profile" subtitle="Your Logistix account">
       <View style={styles.profileCard}>
         <Avatar initials={getInitials(user?.firstName, user?.lastName)} size="lg" />
         <View style={styles.profileInfo}>
           <Text style={styles.name}>{displayName}</Text>
-          <Text style={styles.role}>Customer</Text>
-          <Text style={styles.company}>{user?.phone ?? ''}</Text>
-        </View>
-        <View style={styles.editBtn}>
-          <Ionicons name="create-outline" size={20} color={colors.primary} />
+          <Text style={styles.role}>{mockCustomer.companyName}</Text>
+          <Text style={styles.company}>Customer ID {mockCustomer.customerId}</Text>
         </View>
       </View>
 
-      <View style={styles.emailCard}>
-        <Ionicons name="mail-outline" size={18} color={colors.textMuted} />
-        <Text style={styles.email}>{user?.email ?? '—'}</Text>
+      <View style={styles.metaCard}>
+        <View style={styles.metaRow}>
+          <Ionicons name="call-outline" size={18} color={colors.textMuted} />
+          <Text style={styles.metaText}>{phone}</Text>
+        </View>
+        <View style={styles.metaRow}>
+          <Ionicons name="mail-outline" size={18} color={colors.textMuted} />
+          <Text style={styles.metaText}>{email || '—'}</Text>
+        </View>
+        <View style={styles.metaRow}>
+          <Ionicons name="location-outline" size={18} color={colors.textMuted} />
+          <Text style={styles.metaText}>
+            {mockCustomer.city}, {mockCustomer.country}
+          </Text>
+        </View>
       </View>
 
       {mockProfileSections.map((section) => (
@@ -73,7 +102,7 @@ export default function ProfileScreen() {
         icon={<Ionicons name="log-out-outline" size={18} color={colors.text} />}
       />
 
-      <Text style={styles.version}>Logistix v1.0.0</Text>
+      <Text style={styles.version}>Logistix customer app · v1.0.0</Text>
     </ScreenContainer>
   );
 }
@@ -103,29 +132,25 @@ const styles = StyleSheet.create({
   },
   company: {
     ...typography.caption,
-    color: colors.primary,
+    color: colors.accent,
     marginTop: spacing.xs,
-    fontWeight: '600',
+    fontWeight: '700',
   },
-  editBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.md,
-    backgroundColor: colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emailCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
+  metaCard: {
     backgroundColor: colors.surfaceMuted,
     borderRadius: radius.md,
     padding: spacing.lg,
+    gap: spacing.md,
   },
-  email: {
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  metaText: {
     ...typography.bodySmall,
     color: colors.textSecondary,
+    flex: 1,
   },
   sectionTitle: {
     ...typography.label,

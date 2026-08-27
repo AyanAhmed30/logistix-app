@@ -35,7 +35,7 @@ export function TrackingTimeline({ events }: TrackingTimelineProps) {
               <Text style={[styles.title, event.active && styles.titleActive]}>{event.title}</Text>
               <Text style={styles.description}>{event.description}</Text>
               <View style={styles.meta}>
-                <Text style={styles.location}>{event.location}</Text>
+                {event.location ? <Text style={styles.location}>{event.location}</Text> : null}
                 <Text style={styles.timestamp}>{event.timestamp}</Text>
               </View>
             </View>

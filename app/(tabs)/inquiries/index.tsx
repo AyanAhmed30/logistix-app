@@ -1,21 +1,82 @@
-import { useMemo } from 'react';
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter, type Href } from 'expo-router';
+import { useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
-import { EmptyState, InquiryListItem, ScreenContainer } from '@/components/ui';
-import { colors, radius, spacing, typography } from '@/constants/theme';
+import { EmptyState, FadeIn, FilterChips, ScreenContainer } from '@/components/ui';
+import {
+  matchesRequestFilter,
+  mapInternalToCustomerStatus,
+  REQUEST_FILTER_OPTIONS,
+  RequestFilter,
+} from '@/constants/customer-status';
+import { colors, radius, shadows, spacing, typography } from '@/constants/theme';
+import { mockRequests } from '@/data/mock/customer';
 import { useCustomerPortal } from '@/hooks/useCustomerPortal';
+import { APP_ROUTES } from '@/navigation/routes';
 import { useAuth } from '@/providers';
+import { CustomerInquiry } from '@/types/inquiry';
+import { CustomerStatusKey, MockRequest } from '@/types/customer';
+import { getCustomerStatusVisual } from '@/utils/customer-status-ui';
 import { getPortalErrorMessage } from '@/utils/inquiry-portal-errors';
 
+type ListItem = {
+  id: string;
+  title: string;
+  subtitle: string;
+  meta: string;
+  nextStep: string;
+  status: CustomerStatusKey;
+  source: 'live' | 'demo';
+};
+
+function liveToListItem(inquiry: CustomerInquiry): ListItem {
+  const status = mapInternalToCustomerStatus({
+    status: inquiry.status,
+    sentAt: inquiry.sentAt,
+    approvalStatus: inquiry.approvalStatus,
+    customerSubmitted: inquiry.customerSubmitted,
+    hasQuote: inquiry.hasQuote,
+  });
+  return {
+    id: inquiry.id,
+    title: inquiry.productName?.trim() || 'Freight request',
+    subtitle: inquiry.inquiryNumber,
+    meta: [inquiry.quantity, inquiry.totalWeight].filter(Boolean).join(' · ') || 'Details pending',
+    nextStep: getCustomerStatusVisual(status).nextStep,
+    status,
+    source: 'live',
+  };
+}
+
+function mockToListItem(request: MockRequest): ListItem {
+  return {
+    id: request.id,
+    title: request.productName,
+    subtitle: request.requestNumber,
+    meta: [request.quantity, request.totalWeight].filter(Boolean).join(' · '),
+    nextStep: request.nextStep,
+    status: request.status,
+    source: 'demo',
+  };
+}
+
 export default function InquiriesScreen() {
-  const { user } = useAuth();
-  const { data, isLoading, isError, error, refetch, isRefetching } = useCustomerPortal(user?.id);
+  const router = useRouter();
+  const { sessionToken } = useAuth();
+  const { data, isLoading, isError, error, refetch, isRefetching } = useCustomerPortal(sessionToken);
+  const [filter, setFilter] = useState<RequestFilter>('all');
 
   const leadSummary = useMemo(() => {
-    if (!data?.leads.length) {
-      return null;
-    }
-
+    if (!data?.leads.length) return null;
     const primaryLead = data.leads[0];
     return {
       name: primaryLead.name,
@@ -24,72 +85,165 @@ export default function InquiriesScreen() {
     };
   }, [data?.leads]);
 
-  const inquiries = data?.inquiries ?? [];
+  const liveInquiries = data?.inquiries ?? [];
+  // Demo samples only in development — never in production empty states (Step 2 P0).
+  const usingDemo = __DEV__ && !isLoading && !isError && liveInquiries.length === 0;
+
+  const items = useMemo(() => {
+    const sourceItems = usingDemo
+      ? mockRequests.map(mockToListItem)
+      : liveInquiries.map(liveToListItem);
+
+    return sourceItems.filter((item) => matchesRequestFilter(item.status, filter));
+  }, [filter, liveInquiries, usingDemo]);
 
   return (
     <ScreenContainer
       scrollable={false}
-      title="My Inquiries"
+      title="Requests"
       subtitle={
         leadSummary
-          ? `Lead #${leadSummary.leadNumber ?? '—'} · ${inquiries.length} inquir${inquiries.length === 1 ? 'y' : 'ies'}`
-          : 'Inquiries linked to your phone number'
+          ? `Lead #${leadSummary.leadNumber ?? '—'} · ${liveInquiries.length} request${liveInquiries.length === 1 ? '' : 's'}`
+          : usingDemo
+            ? 'Demo requests for exploration'
+            : 'Freight requests linked to your phone'
+      }
+      headerRight={
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="New request"
+          onPress={() => router.push(APP_ROUTES.inquiryNew as Href)}
+          style={({ pressed }) => [styles.headerBtn, pressed && { opacity: 0.85 }]}
+        >
+          <Ionicons name="add" size={22} color={colors.surface} />
+        </Pressable>
       }
     >
       {isLoading ? (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Loading your inquiries...</Text>
+          <Text style={styles.loadingText}>Loading your requests…</Text>
         </View>
       ) : isError ? (
         <EmptyState
           icon="alert-circle-outline"
-          title="Unable to load inquiries"
+          title="Unable to load requests"
           description={getPortalErrorMessage(error)}
           actionLabel="Retry"
           onActionPress={() => refetch()}
         />
       ) : (
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} tintColor={colors.primary} />
-          }
-          contentContainerStyle={styles.scrollContent}
-        >
-          {leadSummary ? (
-            <View style={styles.leadCard}>
-              <Text style={styles.leadLabel}>Your lead</Text>
-              <Text style={styles.leadName}>{leadSummary.name || 'Customer'}</Text>
-              <View style={styles.leadMetaRow}>
-                <Text style={styles.leadMeta}>Lead #{leadSummary.leadNumber ?? '—'}</Text>
-              </View>
-              {leadSummary.totalLeads > 1 ? (
-                <Text style={styles.leadNote}>
-                  {leadSummary.totalLeads} leads matched your phone number.
-                </Text>
-              ) : null}
-            </View>
-          ) : null}
+        <View style={styles.body}>
+          <FilterChips
+            chips={REQUEST_FILTER_OPTIONS}
+            selectedId={filter}
+            onSelect={(id) => setFilter(id as RequestFilter)}
+          />
 
-          {inquiries.length === 0 ? (
-            <EmptyState
-              icon="document-text-outline"
-              title="No inquiries yet"
-              description={
-                leadSummary
-                  ? 'When your sales agent sends inquiries for your lead, they will appear here.'
-                  : 'No lead was found for your phone number yet. Ask your sales agent to confirm the lead phone matches your account (+92... vs 0300...). Pull down to refresh.'
-              }
-            />
-          ) : (
-            <View style={styles.list}>
-              {inquiries.map((inquiry) => (
-                <InquiryListItem key={inquiry.id} inquiry={inquiry} />
-              ))}
-            </View>
-          )}
-        </ScrollView>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={isRefetching}
+                onRefresh={() => refetch()}
+                tintColor={colors.primary}
+              />
+            }
+            contentContainerStyle={styles.scrollContent}
+          >
+            {leadSummary ? (
+              <FadeIn>
+                <View style={styles.leadCard}>
+                  <Text style={styles.leadLabel}>Your lead</Text>
+                  <Text style={styles.leadName}>{leadSummary.name || 'Customer'}</Text>
+                  <Text style={styles.leadMeta}>Lead #{leadSummary.leadNumber ?? '—'}</Text>
+                  {leadSummary.totalLeads > 1 ? (
+                    <Text style={styles.leadNote}>
+                      {leadSummary.totalLeads} leads matched your phone number.
+                    </Text>
+                  ) : null}
+                </View>
+              </FadeIn>
+            ) : null}
+
+            {usingDemo ? (
+              <View style={styles.demoBanner}>
+                <Ionicons name="sparkles-outline" size={16} color={colors.accentDark} />
+                <Text style={styles.demoText}>
+                  No live requests yet — showing demo samples. Pull to refresh anytime.
+                </Text>
+              </View>
+            ) : null}
+
+            {items.length === 0 ? (
+              <EmptyState
+                icon="document-text-outline"
+                title={usingDemo ? 'No demo matches' : 'No requests yet'}
+                description={
+                  usingDemo
+                    ? 'Try another filter, or create a new request to explore the flow.'
+                    : leadSummary
+                      ? 'When your sales agent sends freight requests for your lead, they will appear here.'
+                      : 'No lead was found for your phone yet. Ask your sales agent to confirm the lead phone matches your account. Pull down to refresh.'
+                }
+                actionLabel="New request"
+                onActionPress={() => router.push(APP_ROUTES.inquiryNew as Href)}
+              />
+            ) : (
+              <View style={styles.list}>
+                {items.map((item, index) => {
+                  const visual = getCustomerStatusVisual(item.status);
+                  return (
+                    <FadeIn key={item.id} delay={index * 40}>
+                      <Pressable
+                        accessibilityRole="button"
+                        onPress={() => router.push(APP_ROUTES.inquiryDetail(item.id) as Href)}
+                        style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+                      >
+                        <View style={styles.cardTop}>
+                          <View style={styles.cardTitles}>
+                            <Text style={styles.cardTitle} numberOfLines={2}>
+                              {item.title}
+                            </Text>
+                            <Text style={styles.cardSubtitle}>
+                              {item.subtitle}
+                              {item.source === 'demo' ? ' · Demo' : ''}
+                            </Text>
+                          </View>
+                          <View
+                            style={[styles.badge, { backgroundColor: visual.backgroundColor }]}
+                          >
+                            <Text style={[styles.badgeText, { color: visual.textColor }]}>
+                              {visual.label}
+                            </Text>
+                          </View>
+                        </View>
+                        <Text style={styles.cardMeta}>{item.meta}</Text>
+                        <Text style={styles.cardNext} numberOfLines={2}>
+                          {item.nextStep}
+                        </Text>
+                        <View style={styles.cardFooter}>
+                          <Text style={styles.viewLink}>View details</Text>
+                          <Ionicons name="chevron-forward" size={16} color={colors.accent} />
+                        </View>
+                      </Pressable>
+                    </FadeIn>
+                  );
+                })}
+              </View>
+            )}
+          </ScrollView>
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="New freight request"
+            onPress={() => router.push(APP_ROUTES.inquiryNew as Href)}
+            style={({ pressed }) => [styles.fab, pressed && { opacity: 0.9 }]}
+          >
+            <Ionicons name="add" size={26} color={colors.surface} />
+            <Text style={styles.fabLabel}>New request</Text>
+          </Pressable>
+        </View>
       )}
     </ScreenContainer>
   );
@@ -101,14 +255,27 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: spacing.xxl,
     gap: spacing.md,
+    flex: 1,
   },
   loadingText: {
     ...typography.bodySmall,
     color: colors.textSecondary,
   },
+  body: {
+    flex: 1,
+    gap: spacing.md,
+  },
   scrollContent: {
     gap: spacing.lg,
-    paddingBottom: spacing.xxl,
+    paddingBottom: 100,
+  },
+  headerBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.md,
+    backgroundColor: colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   leadCard: {
     backgroundColor: colors.primaryLight,
@@ -129,12 +296,6 @@ const styles = StyleSheet.create({
     ...typography.h3,
     color: colors.text,
   },
-  leadMetaRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.md,
-    marginTop: spacing.xs,
-  },
   leadMeta: {
     ...typography.bodySmall,
     color: colors.textSecondary,
@@ -144,7 +305,97 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginTop: spacing.xs,
   },
+  demoBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    backgroundColor: colors.accentLight,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: '#B2EBEB',
+  },
+  demoText: {
+    ...typography.bodySmall,
+    color: colors.accentDark,
+    flex: 1,
+  },
   list: {
     gap: spacing.md,
+  },
+  card: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    gap: spacing.sm,
+    ...shadows.sm,
+  },
+  cardPressed: {
+    opacity: 0.92,
+  },
+  cardTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    alignItems: 'flex-start',
+  },
+  cardTitles: {
+    flex: 1,
+    gap: 2,
+  },
+  cardTitle: {
+    ...typography.label,
+    fontSize: 15,
+    color: colors.text,
+  },
+  cardSubtitle: {
+    ...typography.caption,
+    color: colors.textMuted,
+  },
+  badge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.full,
+  },
+  badgeText: {
+    ...typography.caption,
+    fontWeight: '700',
+  },
+  cardMeta: {
+    ...typography.caption,
+    color: colors.textSecondary,
+  },
+  cardNext: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    marginTop: spacing.xs,
+  },
+  viewLink: {
+    ...typography.label,
+    color: colors.accent,
+  },
+  fab: {
+    position: 'absolute',
+    right: 0,
+    bottom: spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.full,
+    ...shadows.md,
+  },
+  fabLabel: {
+    ...typography.label,
+    color: colors.surface,
   },
 });

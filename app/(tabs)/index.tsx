@@ -1,92 +1,290 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useRouter, type Href } from 'expo-router';
+import { useMemo } from 'react';
+import { ActivityIndicator, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import {
-  OrderListItem,
-  QuickAction,
+  ActionCard,
+  EmptyState,
+  FadeIn,
   ScreenContainer,
   SectionHeader,
-  StatCard,
+  SkeletonCard,
 } from '@/components/ui';
-import { mockDashboardStats, mockQuickActions, mockRecentOrders } from '@/data/mock/dashboard';
-import { colors, radius, spacing, typography } from '@/constants/theme';
+import {
+  getCustomerStatusConfig,
+} from '@/constants/customer-status';
+import { colors, radius, shadows, spacing, typography } from '@/constants/theme';
+import { useCustomerPortal } from '@/hooks/useCustomerPortal';
+import { APP_ROUTES } from '@/navigation/routes';
+import { useAuth } from '@/providers';
+import { getCustomerStatusVisual } from '@/utils/customer-status-ui';
+import {
+  deriveHomeActions,
+  getActivePortalInquiries,
+  getInquiryCustomerStatus,
+} from '@/utils/home-dashboard';
+import { getPortalErrorMessage } from '@/utils/inquiry-portal-errors';
 
-/**
- * Dashboard Screen
- *
- * Purpose: Operations overview — KPIs, quick actions, and recent activity at a glance.
- * Uses mock data to demonstrate layout patterns for a logistics command center.
- */
-export default function DashboardScreen() {
-  const handleQuickAction = (_id: string) => {
-    // UI placeholder
-  };
+function greetingForNow(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
+}
 
-  const handleOrderPress = (_id: string) => {
-    // UI placeholder
-  };
+export default function CustomerHomeScreen() {
+  const router = useRouter();
+  const { user, sessionToken } = useAuth();
+  const { data, isLoading, isError, error, refetch, isRefetching } = useCustomerPortal(sessionToken);
+
+  const inquiries = data?.inquiries ?? [];
+  const lead = data?.leads?.[0];
+
+  const activeRequests = useMemo(() => getActivePortalInquiries(inquiries), [inquiries]);
+  const actions = useMemo(() => deriveHomeActions(inquiries), [inquiries]);
+  const completedCount = useMemo(
+    () =>
+      inquiries.filter((inq) => {
+        const status = getInquiryCustomerStatus(inq);
+        return status === 'completed';
+      }).length,
+    [inquiries],
+  );
+
+  const firstName = user?.firstName?.trim() || 'there';
+  const customerId = lead?.leadNumber?.trim() || null;
+  const companyName = lead?.name?.trim() || null;
+  const subtitle = customerId
+    ? `Customer ID ${customerId}${companyName ? ` · ${companyName}` : ''}`
+    : companyName || 'Your logistics overview';
+
+  if (isLoading && !data) {
+    return (
+      <ScreenContainer title="Home" subtitle="Loading your logistics overview…">
+        <SkeletonCard />
+        <SkeletonCard />
+        <SkeletonCard />
+      </ScreenContainer>
+    );
+  }
+
+  if (isError && !data) {
+    return (
+      <ScreenContainer title="Home" subtitle="Unable to load">
+        <EmptyState
+          icon="alert-circle-outline"
+          title="Unable to load home"
+          description={getPortalErrorMessage(error)}
+          actionLabel="Retry"
+          onActionPress={() => refetch()}
+        />
+      </ScreenContainer>
+    );
+  }
 
   return (
     <ScreenContainer
-      title="Dashboard"
-      subtitle="Good morning, Sarah 👋"
+      title={`${greetingForNow()}, ${firstName}`}
+      subtitle={subtitle}
       headerRight={
-        <Pressable style={styles.notificationBtn} accessibilityRole="button">
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Notifications"
+          onPress={() => router.push(APP_ROUTES.notifications as Href)}
+          style={styles.bell}
+        >
           <Ionicons name="notifications-outline" size={22} color={colors.text} />
-          <View style={styles.notificationDot} />
         </Pressable>
       }
+      scrollable
+      refreshControl={
+        <RefreshControl
+          refreshing={isRefetching}
+          onRefresh={() => refetch()}
+          tintColor={colors.accent}
+        />
+      }
     >
-      <View style={styles.statsGrid}>
-        {mockDashboardStats.map((stat) => (
-          <StatCard key={stat.id} stat={stat} />
-        ))}
-      </View>
+      <FadeIn>
+        <View style={styles.summaryRow}>
+          <SummaryTile
+            label="Active requests"
+            value={String(activeRequests.length)}
+            icon="document-text-outline"
+            color={colors.primary}
+          />
+          <SummaryTile
+            label="Actions"
+            value={String(actions.length)}
+            icon="alert-circle-outline"
+            color={colors.warning}
+          />
+          <SummaryTile
+            label="Completed"
+            value={String(completedCount)}
+            icon="checkmark-circle-outline"
+            color={colors.success}
+          />
+        </View>
+      </FadeIn>
 
-      <View>
-        <SectionHeader title="Quick Actions" />
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View style={styles.quickActions}>
-            {mockQuickActions.map((action) => (
-              <QuickAction
-                key={action.id}
-                label={action.label}
-                icon={action.icon}
-                onPress={() => handleQuickAction(action.id)}
+      <FadeIn delay={80}>
+        <SectionHeader title="Things you need to do" />
+        {actions.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyTitle}>You’re all caught up</Text>
+            <Text style={styles.emptyBody}>
+              When a quote is ready or something needs your input, it will show up here.
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.stack}>
+            {actions.map((item) => (
+              <ActionCard
+                key={item.id}
+                item={item}
+                onPress={() => {
+                  if (item.requestId) {
+                    router.push(APP_ROUTES.inquiryDetail(item.requestId) as Href);
+                  }
+                }}
               />
             ))}
           </View>
-        </ScrollView>
-      </View>
+        )}
+      </FadeIn>
 
-      <View style={styles.alertBanner}>
-        <Ionicons name="warning-outline" size={20} color={colors.warning} />
-        <View style={styles.alertContent}>
-          <Text style={styles.alertTitle}>2 shipments delayed</Text>
-          <Text style={styles.alertText}>Review affected orders in the Orders tab.</Text>
-        </View>
-        <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-      </View>
+      <FadeIn delay={140}>
+        <SectionHeader
+          title="Active requests"
+          actionLabel="See all"
+          onActionPress={() => router.push(APP_ROUTES.inquiries as Href)}
+        />
+        {activeRequests.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyTitle}>No active requests</Text>
+            <Text style={styles.emptyBody}>
+              Sent freight requests linked to your phone will appear here.
+            </Text>
+            <Pressable
+              onPress={() => router.push(APP_ROUTES.inquiries as Href)}
+              style={styles.emptyLinkWrap}
+            >
+              <Text style={styles.emptyLink}>Go to Requests</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <View style={styles.stack}>
+            {activeRequests.slice(0, 3).map((req) => {
+              const status = getInquiryCustomerStatus(req);
+              const visual = getCustomerStatusVisual(status);
+              const config = getCustomerStatusConfig(status);
+              return (
+                <Pressable
+                  key={req.id}
+                  accessibilityRole="button"
+                  onPress={() => router.push(APP_ROUTES.inquiryDetail(req.id) as Href)}
+                  style={({ pressed }) => [styles.requestCard, pressed && { opacity: 0.92 }]}
+                >
+                  <View style={styles.requestTop}>
+                    <Text style={styles.requestTitle}>
+                      {req.productName?.trim() || 'Freight request'}
+                    </Text>
+                    <View style={[styles.badge, { backgroundColor: visual.backgroundColor }]}>
+                      <Text style={[styles.badgeText, { color: visual.textColor }]}>
+                        {visual.label}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={styles.requestMeta}>
+                    {[req.inquiryNumber, req.quantity].filter(Boolean).join(' · ')}
+                  </Text>
+                  <Text style={styles.requestNext}>{config.nextEvent}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
+      </FadeIn>
 
-      <View>
-        <SectionHeader title="Recent Orders" actionLabel="See all" onActionPress={() => {}} />
-        <View style={styles.orderList}>
-          {mockRecentOrders.map((order) => (
-            <OrderListItem
-              key={order.id}
-              order={order}
-              compact
-              onPress={() => handleOrderPress(order.id)}
-            />
-          ))}
+      {/* Recent shipments hidden until inquiry↔order linkage exists (Step 6). */}
+
+      <FadeIn delay={200}>
+        <SectionHeader title="Quick actions" />
+        <View style={styles.quickRow}>
+          <QuickTile
+            icon="add-circle-outline"
+            label="New request"
+            onPress={() => router.push(APP_ROUTES.inquiryNew as Href)}
+          />
+          <QuickTile
+            icon="document-text-outline"
+            label="Requests"
+            onPress={() => router.push(APP_ROUTES.inquiries as Href)}
+          />
+          <QuickTile
+            icon="headset-outline"
+            label="Support"
+            onPress={() => router.push(APP_ROUTES.support as Href)}
+          />
         </View>
-      </View>
+      </FadeIn>
+
+      {isRefetching ? (
+        <View style={styles.refreshHint}>
+          <ActivityIndicator size="small" color={colors.primary} />
+        </View>
+      ) : null}
     </ScreenContainer>
   );
 }
 
+function SummaryTile({
+  label,
+  value,
+  icon,
+  color,
+}: {
+  label: string;
+  value: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  color: string;
+}) {
+  return (
+    <View style={styles.summaryTile}>
+      <Ionicons name={icon} size={18} color={color} />
+      <Text style={styles.summaryValue}>{value}</Text>
+      <Text style={styles.summaryLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function QuickTile({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [styles.quickTile, pressed && { opacity: 0.9 }]}
+    >
+      <View style={styles.quickIcon}>
+        <Ionicons name={icon} size={22} color={colors.accent} />
+      </View>
+      <Text style={styles.quickLabel}>{label}</Text>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
-  notificationBtn: {
+  bell: {
     width: 44,
     height: 44,
     borderRadius: radius.md,
@@ -96,50 +294,121 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  notificationDot: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.error,
-    borderWidth: 1.5,
-    borderColor: colors.surface,
-  },
-  statsGrid: {
+  summaryRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: spacing.md,
   },
-  quickActions: {
-    flexDirection: 'row',
-    gap: spacing.lg,
-    paddingRight: spacing.xl,
+  summaryTile: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    gap: spacing.xs,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    ...shadows.sm,
   },
-  alertBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  summaryValue: {
+    ...typography.h2,
+    color: colors.text,
+  },
+  summaryLabel: {
+    ...typography.caption,
+    color: colors.textSecondary,
+  },
+  stack: {
     gap: spacing.md,
-    backgroundColor: colors.warningLight,
+  },
+  emptyCard: {
+    backgroundColor: colors.surfaceMuted,
     borderRadius: radius.lg,
     padding: spacing.lg,
+    gap: spacing.xs,
     borderWidth: 1,
-    borderColor: '#FDE68A',
+    borderColor: colors.borderLight,
   },
-  alertContent: {
+  emptyTitle: {
+    ...typography.label,
+    color: colors.text,
+  },
+  emptyBody: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+  },
+  emptyLinkWrap: {
+    marginTop: spacing.sm,
+  },
+  emptyLink: {
+    ...typography.label,
+    color: colors.accent,
+  },
+  requestCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    ...shadows.sm,
+  },
+  requestTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+  },
+  requestTitle: {
+    ...typography.label,
+    fontSize: 15,
+    color: colors.text,
     flex: 1,
   },
-  alertTitle: {
-    ...typography.label,
-    color: '#92400E',
-  },
-  alertText: {
+  requestMeta: {
     ...typography.caption,
-    color: '#B45309',
-    marginTop: 2,
+    color: colors.textMuted,
   },
-  orderList: {
+  requestNext: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+  },
+  badge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.full,
+  },
+  badgeText: {
+    ...typography.caption,
+    fontWeight: '700',
+  },
+  quickRow: {
+    flexDirection: 'row',
     gap: spacing.md,
+  },
+  quickTile: {
+    flex: 1,
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+  },
+  quickIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.md,
+    backgroundColor: colors.accentLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quickLabel: {
+    ...typography.caption,
+    color: colors.text,
+    fontWeight: '600',
+  },
+  refreshHint: {
+    alignItems: 'center',
+    paddingTop: spacing.sm,
   },
 });

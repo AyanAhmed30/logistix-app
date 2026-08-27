@@ -37,6 +37,13 @@ type RpcInquiryRow = {
   shipping_mark: string | null;
   origin: string | null;
   destination: string | null;
+  customer_submitted?: boolean;
+  approval_status?: string | null;
+  sent_to_accounting?: boolean;
+  has_quote?: boolean;
+  quote_total?: number | string | null;
+  quote_number?: string | null;
+  quote_sent_at?: string | null;
 };
 
 type RpcResponse = {
@@ -75,6 +82,16 @@ function toInquiry(row: RpcInquiryRow): CustomerInquiry {
     shippingMark: row.shipping_mark,
     origin: row.origin,
     destination: row.destination,
+    customerSubmitted: Boolean(row.customer_submitted),
+    approvalStatus: row.approval_status ?? null,
+    sentToAccounting: Boolean(row.sent_to_accounting),
+    hasQuote: Boolean(row.has_quote),
+    quoteTotal:
+      row.quote_total === null || row.quote_total === undefined
+        ? null
+        : Number(row.quote_total),
+    quoteNumber: row.quote_number ?? null,
+    quoteSentAt: row.quote_sent_at ?? null,
   };
 }
 
@@ -90,6 +107,7 @@ function mapRpcError(error: PostgrestError | Error): Error {
     pgError.code === '42501' ||
     message.includes('unauthorized_phone') ||
     message.includes('unauthorized_user') ||
+    message.includes('invalid_session') ||
     message.includes('permission denied')
   ) {
     return new Error('unauthorized_portal_access');
@@ -97,13 +115,17 @@ function mapRpcError(error: PostgrestError | Error): Error {
 
   if (message.includes('relation') && message.includes('does not exist')) {
     return new Error(
-      'portal_schema_missing: Run logistix-app migrations 009–013 in Supabase SQL Editor.',
+      'portal_schema_missing: Run logistix-app migrations 009–014 in Supabase SQL Editor.',
     );
   }
 
-  if (message.includes('get_customer_portal_by_user_id') && message.includes('does not exist')) {
+  if (
+    (message.includes('get_customer_portal_by_session') ||
+      message.includes('get_customer_portal_by_user_id')) &&
+    message.includes('does not exist')
+  ) {
     return new Error(
-      'portal_schema_missing: Run logistix-app migration 013_customer_portal_by_user_id.sql in Supabase.',
+      'portal_schema_missing: Run logistix-app migration 014_identity_hardening_sessions.sql in Supabase.',
     );
   }
 
@@ -120,7 +142,13 @@ function mapPortalPayload(payload: RpcResponse): CustomerPortalData {
   return { leads, inquiries };
 }
 
-export async function fetchCustomerPortalByUserId(userId: string): Promise<CustomerPortalResult> {
+/**
+ * Customer portal — requires a server-issued session token (Step 2 P0).
+ * Does not accept a client-supplied user id.
+ */
+export async function fetchCustomerPortalBySession(
+  sessionToken: string,
+): Promise<CustomerPortalResult> {
   try {
     if (!isSupabaseConfigured()) {
       return {
@@ -131,49 +159,15 @@ export async function fetchCustomerPortalByUserId(userId: string): Promise<Custo
       };
     }
 
-    if (!userId.trim()) {
+    if (!sessionToken.trim() || sessionToken.trim().length < 32) {
       return {
         data: null,
         error: new Error('unauthorized_portal_access'),
       };
     }
 
-    const { data, error } = await getSupabase().rpc('get_customer_portal_by_user_id', {
-      p_user_id: userId,
-    });
-
-    if (error) {
-      return { data: null, error: mapRpcError(error) };
-    }
-
-    const payload = (data ?? { leads: [], inquiries: [] }) as RpcResponse;
-
-    return {
-      data: mapPortalPayload(payload),
-      error: null,
-    };
-  } catch (error) {
-    return {
-      data: null,
-      error: error instanceof Error ? error : new Error('Unable to load inquiries.'),
-    };
-  }
-}
-
-/** @deprecated Use fetchCustomerPortalByUserId — phone is resolved server-side from the user id. */
-export async function fetchCustomerPortalByPhone(phone: string): Promise<CustomerPortalResult> {
-  try {
-    if (!isSupabaseConfigured()) {
-      return {
-        data: null,
-        error: new Error(
-          'Supabase is not configured. Add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY to .env.',
-        ),
-      };
-    }
-
-    const { data, error } = await getSupabase().rpc('get_customer_portal_by_phone', {
-      p_phone: phone,
+    const { data, error } = await getSupabase().rpc('get_customer_portal_by_session', {
+      p_session_token: sessionToken,
     });
 
     if (error) {

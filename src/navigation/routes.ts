@@ -5,11 +5,24 @@ export const AUTH_ROUTES = {
   signupWizard: '/(auth)/signup-wizard',
   login: '/(auth)/login',
   welcome: '/(auth)/welcome',
+  forgotPassword: '/(auth)/forgot-password',
 } as const;
 
 export const APP_ROUTES = {
   tabs: '/(tabs)',
+  home: '/(tabs)',
   inquiries: '/(tabs)/inquiries',
+  inquiryNew: '/(tabs)/inquiries/new',
+  inquiryDetail: (id: string) => `/(tabs)/inquiries/${id}` as const,
+  inquiryQuote: (id: string) => `/(tabs)/inquiries/${id}/quote` as const,
+  orders: '/(tabs)/orders',
+  orderDetail: (id: string) => `/(tabs)/orders/${id}` as const,
+  tracking: '/(tabs)/tracking',
+  profile: '/(tabs)/profile',
+  profileEdit: '/(tabs)/profile/edit',
+  profileSecurity: '/(tabs)/profile/security',
+  notifications: '/(tabs)/profile/notifications',
+  support: '/(tabs)/profile/support',
 } as const;
 
 export type AuthRoute = (typeof AUTH_ROUTES)[keyof typeof AUTH_ROUTES];

@@ -20,21 +20,25 @@ export function FilterChips({ chips, selectedId, onSelect }: FilterChipsProps) {
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.container}
+      style={styles.scroll}
     >
-      {chips.map((chip) => {
+      {chips.map((chip, index) => {
         const isSelected = chip.id === selectedId;
+        const isLast = index === chips.length - 1;
         return (
           <Pressable
             key={chip.id}
             accessibilityRole="button"
             accessibilityState={{ selected: isSelected }}
             onPress={() => onSelect(chip.id)}
-            style={[styles.chip, isSelected && styles.chipSelected]}
+            style={[styles.chip, isSelected && styles.chipSelected, !isLast && styles.chipSpacing]}
           >
             {isSelected ? (
-              <Ionicons name="checkmark" size={14} color={colors.surface} style={styles.icon} />
+              <Ionicons name="checkmark" size={14} color={colors.surface} />
             ) : null}
-            <Text style={[styles.label, isSelected && styles.labelSelected]}>{chip.label}</Text>
+            <Text style={[styles.label, isSelected && styles.labelSelected]} numberOfLines={1}>
+              {chip.label}
+            </Text>
           </Pressable>
         );
       })}
@@ -43,26 +47,33 @@ export function FilterChips({ chips, selectedId, onSelect }: FilterChipsProps) {
 }
 
 const styles = StyleSheet.create({
+  scroll: {
+    flexGrow: 0,
+  },
   container: {
-    gap: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingVertical: spacing.xs,
+    paddingRight: spacing.md,
   },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexShrink: 0,
+    gap: spacing.xs,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.sm + 2,
     borderRadius: radius.full,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
   },
+  chipSpacing: {
+    marginRight: spacing.sm,
+  },
   chipSelected: {
     backgroundColor: colors.primary,
     borderColor: colors.primary,
-  },
-  icon: {
-    marginRight: spacing.xs,
   },
   label: {
     ...typography.label,

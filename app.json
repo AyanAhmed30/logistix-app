@@ -22,7 +22,17 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": ["expo-router", "expo-secure-store"],
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Logistix to attach product photos to your freight request.",
+          "cameraPermission": "Allow Logistix to photograph cargo for your freight request."
+        }
+      ]
+    ],
     "experiments": {
       "typedRoutes": true
     }

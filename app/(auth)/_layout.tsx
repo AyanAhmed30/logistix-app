@@ -13,6 +13,7 @@ export default function AuthLayout() {
         <Stack.Screen name="signup" />
         <Stack.Screen name="signup-wizard" />
         <Stack.Screen name="login" />
+        <Stack.Screen name="forgot-password" />
         <Stack.Screen name="welcome" options={{ animation: 'fade', gestureEnabled: false }} />
       </Stack>
     </SignupFlowProvider>

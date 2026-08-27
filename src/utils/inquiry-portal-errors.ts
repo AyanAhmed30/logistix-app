@@ -8,8 +8,8 @@ export function getPortalErrorMessage(error: unknown): string {
 
   const lower = message.toLowerCase();
 
-  if (lower.includes('unauthorized_portal_access')) {
-    return 'Your account is not authorized to view inquiries. Please sign in again.';
+  if (lower.includes('unauthorized_portal_access') || lower.includes('invalid_session')) {
+    return 'Your session expired or is not authorized. Please sign in again.';
   }
 
   if (lower.includes('portal_schema_missing')) {

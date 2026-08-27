@@ -26,6 +26,13 @@ export type CustomerInquiry = {
   shippingMark: string | null;
   origin: string | null;
   destination: string | null;
+  customerSubmitted?: boolean;
+  approvalStatus?: string | null;
+  sentToAccounting?: boolean;
+  hasQuote?: boolean;
+  quoteTotal?: number | null;
+  quoteNumber?: string | null;
+  quoteSentAt?: string | null;
 };
 
 export type CustomerPortalData = {

@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter, type Href } from 'expo-router';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AuthFooterLink, AuthScreenLayout, ErrorBanner } from '@/components/auth';
 import { Button, TextInput } from '@/components/ui';
@@ -11,6 +11,7 @@ import { useAuth } from '@/providers';
 import { loginUser } from '@/services/auth';
 import { getAuthErrorMessage } from '@/utils/auth-errors';
 import { LoginFormValues, loginSchema, normalizePhoneNumber } from '@/utils/validation';
+import { colors, spacing, typography } from '@/constants/theme';
 
 export function LoginScreen() {
   const router = useRouter();
@@ -37,14 +38,14 @@ export function LoginScreen() {
       return;
     }
 
-    await signIn(result.data);
-    router.replace(APP_ROUTES.inquiries as Href);
+    await signIn(result.data.user, result.data.sessionToken, result.data.expiresAt);
+    router.replace(APP_ROUTES.home as Href);
   };
 
   return (
     <AuthScreenLayout
       title="Welcome back"
-      subtitle="Sign in with your phone number and password."
+      subtitle="Sign in with the phone number linked to your Logistix Customer ID."
       footer={
         <AuthFooterLink
           prompt="Don't have an account?"
@@ -62,7 +63,7 @@ export function LoginScreen() {
           render={({ field: { onChange, onBlur, value } }) => (
             <TextInput
               label="Phone Number"
-              placeholder="+1 415 555 2671"
+              placeholder="+92 300 1234567"
               keyboardType="phone-pad"
               autoComplete="tel"
               leftIcon="call-outline"
@@ -91,6 +92,14 @@ export function LoginScreen() {
           )}
         />
 
+        <Pressable
+          accessibilityRole="link"
+          onPress={() => router.push(AUTH_ROUTES.forgotPassword)}
+          style={styles.forgotWrap}
+        >
+          <Text style={styles.forgot}>Forgot password?</Text>
+        </Pressable>
+
         <Button
           label="Sign In"
           fullWidth
@@ -105,6 +114,14 @@ export function LoginScreen() {
 
 const styles = StyleSheet.create({
   form: {
-    gap: 16,
+    gap: spacing.lg,
+  },
+  forgotWrap: {
+    alignSelf: 'flex-end',
+    marginTop: -spacing.sm,
+  },
+  forgot: {
+    ...typography.label,
+    color: colors.accent,
   },
 });

@@ -1,25 +1,32 @@
+/**
+ * Logistix brand design system — navy + teal from official wordmark.
+ */
 export const colors = {
-  primary: '#2563EB',
-  primaryDark: '#1D4ED8',
-  primaryLight: '#DBEAFE',
-  accent: '#0EA5E9',
-  background: '#F1F5F9',
+  brandNavy: '#0B1F3A',
+  brandTeal: '#00A8A8',
+  primary: '#0B1F3A',
+  primaryDark: '#061426',
+  primaryLight: '#E8EEF5',
+  accent: '#00A8A8',
+  accentDark: '#008F8F',
+  accentLight: '#D6F5F5',
+  background: '#F4F6F9',
   surface: '#FFFFFF',
   surfaceMuted: '#F8FAFC',
   border: '#E2E8F0',
-  borderLight: '#F1F5F9',
-  text: '#0F172A',
-  textSecondary: '#64748B',
-  textMuted: '#94A3B8',
-  success: '#10B981',
-  successLight: '#D1FAE5',
-  warning: '#F59E0B',
+  borderLight: '#EEF2F6',
+  text: '#0B1F3A',
+  textSecondary: '#5B6B7C',
+  textMuted: '#8B9AAB',
+  success: '#0D9488',
+  successLight: '#CCFBF1',
+  warning: '#D97706',
   warningLight: '#FEF3C7',
-  error: '#EF4444',
+  error: '#DC2626',
   errorLight: '#FEE2E2',
-  info: '#6366F1',
-  infoLight: '#E0E7FF',
-  overlay: 'rgba(15, 23, 42, 0.5)',
+  info: '#0284C7',
+  infoLight: '#E0F2FE',
+  overlay: 'rgba(11, 31, 58, 0.55)',
 } as const;
 
 export const spacing = {
@@ -30,6 +37,7 @@ export const spacing = {
   xl: 20,
   xxl: 24,
   xxxl: 32,
+  huge: 40,
 } as const;
 
 export const radius = {
@@ -37,6 +45,7 @@ export const radius = {
   md: 12,
   lg: 16,
   xl: 20,
+  xxl: 24,
   full: 9999,
 } as const;
 
@@ -52,17 +61,24 @@ export const typography = {
 
 export const shadows = {
   sm: {
-    shadowColor: '#0F172A',
+    shadowColor: '#0B1F3A',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
+    shadowOpacity: 0.06,
+    shadowRadius: 3,
     elevation: 1,
   },
   md: {
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 2 },
+    shadowColor: '#0B1F3A',
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
-    shadowRadius: 8,
+    shadowRadius: 12,
     elevation: 3,
+  },
+  lg: {
+    shadowColor: '#0B1F3A',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 20,
+    elevation: 6,
   },
 } as const;

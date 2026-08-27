@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import {
@@ -12,27 +12,29 @@ import {
   StatusBadge,
   TrackingTimeline,
 } from '@/components/ui';
-import { mockActiveShipment, mockRecentTrackingIds } from '@/data/mock/tracking';
 import { colors, radius, spacing, typography } from '@/constants/theme';
+import { mockShipments } from '@/data/mock/customer';
 
-/**
- * Tracking Screen
- *
- * Purpose: Shipment visibility — map preview, progress, and event timeline.
- * Shows how real-time tracking will look using mock shipment data.
- */
 export default function TrackingScreen() {
-  const [selectedId, setSelectedId] = useState(mockActiveShipment.id);
-  const shipment = mockActiveShipment;
+  const [selectedId, setSelectedId] = useState(mockShipments[0]?.id ?? '');
 
-  const handleShareTracking = () => {
-    // UI placeholder
-  };
+  const shipment = useMemo(
+    () => mockShipments.find((s) => s.id === selectedId) ?? mockShipments[0],
+    [selectedId],
+  );
+
+  if (!shipment) {
+    return (
+      <ScreenContainer title="Tracking" subtitle="No active shipments">
+        <Text style={styles.empty}>When cargo moves through the warehouse, milestones will appear here.</Text>
+      </ScreenContainer>
+    );
+  }
 
   return (
-    <ScreenContainer title="Tracking" subtitle="Monitor shipment progress">
+    <ScreenContainer title="Tracking" subtitle="Warehouse milestones & transit">
       <View style={styles.shipmentTabs}>
-        {mockRecentTrackingIds.map((item) => {
+        {mockShipments.map((item) => {
           const isSelected = item.id === selectedId;
           return (
             <Pressable
@@ -45,7 +47,9 @@ export default function TrackingScreen() {
               <Text style={[styles.tabRef, isSelected && styles.tabRefActive]}>
                 {item.reference}
               </Text>
-              <Text style={[styles.tabEta, isSelected && styles.tabEtaActive]}>{item.eta}</Text>
+              <Text style={[styles.tabEta, isSelected && styles.tabEtaActive]}>
+                {item.statusLabel}
+              </Text>
             </Pressable>
           );
         })}
@@ -55,27 +59,22 @@ export default function TrackingScreen() {
 
       <Card>
         <View style={styles.shipmentHeader}>
-          <View>
+          <View style={styles.headerText}>
             <CardTitle>{shipment.reference}</CardTitle>
-            <CardDescription>{shipment.carrier}</CardDescription>
+            <CardDescription>{shipment.carrier} · Logistix warehouse network</CardDescription>
           </View>
           <StatusBadge status={shipment.status} />
         </View>
 
-        <ProgressBar progress={shipment.progress} label="Delivery progress" />
+        <Text style={styles.explanation}>{shipment.explanation}</Text>
+
+        <ProgressBar progress={shipment.progress} label="Journey progress" />
 
         <View style={styles.etaRow}>
           <View style={styles.etaItem}>
-            <Text style={styles.etaLabel}>Estimated delivery</Text>
+            <Text style={styles.etaLabel}>Estimated next milestone</Text>
             <Text style={styles.etaValue}>{shipment.estimatedDelivery}</Text>
           </View>
-          <Pressable
-            accessibilityRole="button"
-            onPress={handleShareTracking}
-            style={styles.shareBtn}
-          >
-            <Text style={styles.shareBtnText}>Share</Text>
-          </Pressable>
         </View>
       </Card>
 
@@ -83,13 +82,13 @@ export default function TrackingScreen() {
         <View style={styles.routeItem}>
           <View style={[styles.routeDot, { backgroundColor: colors.primary }]} />
           <View>
-            <Text style={styles.routeLabel}>Origin</Text>
+            <Text style={styles.routeLabel}>Origin / warehouse</Text>
             <Text style={styles.routeValue}>{shipment.origin}</Text>
           </View>
         </View>
         <View style={styles.routeDivider} />
         <View style={styles.routeItem}>
-          <View style={[styles.routeDot, { backgroundColor: colors.success }]} />
+          <View style={[styles.routeDot, { backgroundColor: colors.accent }]} />
           <View>
             <Text style={styles.routeLabel}>Destination</Text>
             <Text style={styles.routeValue}>{shipment.destination}</Text>
@@ -98,7 +97,7 @@ export default function TrackingScreen() {
       </View>
 
       <View>
-        <SectionHeader title="Tracking History" />
+        <SectionHeader title="Milestone history" />
         <Card style={styles.timelineCard}>
           <TrackingTimeline events={shipment.events} />
         </Card>
@@ -108,12 +107,18 @@ export default function TrackingScreen() {
 }
 
 const styles = StyleSheet.create({
+  empty: {
+    ...typography.body,
+    color: colors.textSecondary,
+  },
   shipmentTabs: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: spacing.sm,
   },
   shipmentTab: {
-    flex: 1,
+    flexGrow: 1,
+    minWidth: '45%',
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.sm,
     borderRadius: radius.md,
@@ -128,7 +133,7 @@ const styles = StyleSheet.create({
   },
   tabRef: {
     ...typography.caption,
-    fontWeight: '600',
+    fontWeight: '700',
     color: colors.text,
   },
   tabRefActive: {
@@ -140,18 +145,24 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   tabEtaActive: {
-    color: 'rgba(255,255,255,0.75)',
+    color: 'rgba(255,255,255,0.8)',
   },
   shipmentHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
+    marginBottom: spacing.md,
+    gap: spacing.sm,
+  },
+  headerText: {
+    flex: 1,
+  },
+  explanation: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
     marginBottom: spacing.lg,
   },
   etaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     marginTop: spacing.lg,
     paddingTop: spacing.lg,
     borderTopWidth: 1,
@@ -168,16 +179,6 @@ const styles = StyleSheet.create({
     ...typography.label,
     color: colors.text,
     marginTop: 2,
-  },
-  shareBtn: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.full,
-    backgroundColor: colors.primaryLight,
-  },
-  shareBtnText: {
-    ...typography.label,
-    color: colors.primary,
   },
   routeCard: {
     backgroundColor: colors.surface,

@@ -26,7 +26,7 @@ export type TrackingEvent = {
   id: string;
   title: string;
   description: string;
-  location: string;
+  location?: string;
   timestamp: string;
   completed: boolean;
   active: boolean;
