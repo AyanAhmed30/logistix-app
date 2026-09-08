@@ -8,6 +8,12 @@ export function getAuthErrorMessage(error: unknown): string {
 
   const lower = message.toLowerCase();
 
+  if (lower.includes('no_active_sales_agent')) {
+    return 'Registration is temporarily unavailable because no active Sales Agent is available. Please try again later or contact support.';
+  }
+  if (lower.includes('invalid_phone')) {
+    return 'Enter a valid phone number.';
+  }
   if (lower.includes('invalid_credentials')) {
     return 'Invalid phone number or password. Please try again.';
   }

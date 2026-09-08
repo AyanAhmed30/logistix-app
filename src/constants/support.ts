@@ -1,11 +1,4 @@
-export const SUPPORT_CONTACT = {
-  phone: '+92 300 0000000',
-  phoneTel: 'tel:+923000000000',
-  whatsapp: 'https://wa.me/923000000000',
-  email: 'support@logistix.example',
-  emailMailto: 'mailto:support@logistix.example?subject=Logistix%20Support',
-} as const;
-
+/** FAQ copy for Profile → Support. Contact channels use the assigned Sales Agent RPC. */
 export const SUPPORT_FAQ = [
   {
     id: 'status',

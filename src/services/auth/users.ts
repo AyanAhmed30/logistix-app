@@ -99,6 +99,12 @@ function mapDatabaseError(error: PostgrestError | Error): Error {
   if (message.includes('weak_password')) {
     return new Error('weak_password');
   }
+  if (message.includes('no_active_sales_agent')) {
+    return new Error('no_active_sales_agent');
+  }
+  if (message.includes('invalid_phone')) {
+    return new Error('invalid_phone');
+  }
   if (message.includes('duplicate_phone') || (message.includes('duplicate') && message.includes('phone'))) {
     return new Error('duplicate_phone');
   }

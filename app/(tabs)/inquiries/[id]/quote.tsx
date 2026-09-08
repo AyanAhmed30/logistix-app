@@ -1,7 +1,16 @@
-import { Ionicons } from '@expo/vector-icons';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
-import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Linking,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
 import {
   Button,
@@ -10,14 +19,21 @@ import {
   FadeIn,
   ScreenContainer,
   SectionHeader,
+  TextInput,
 } from '@/components/ui';
-import { colors, spacing, typography } from '@/constants/theme';
+import { colors, radius, spacing, typography } from '@/constants/theme';
 import { APP_ROUTES } from '@/navigation/routes';
 import { useAuth } from '@/providers';
-import { fetchCustomerQuoteBySession } from '@/services/inquiries';
+import {
+  acceptCustomerQuotation,
+  declineCustomerQuotation,
+  fetchCustomerQuoteBySession,
+  submitQuotationNegotiation,
+  type NegotiationHistoryItem,
+} from '@/services/inquiries';
 
-function formatMoney(amount: number | null): string {
-  if (amount === null || Number.isNaN(amount)) return '—';
+function formatMoney(amount: number | null | undefined): string {
+  if (amount === null || amount === undefined || Number.isNaN(amount)) return '—';
   try {
     return new Intl.NumberFormat(undefined, {
       style: 'currency',
@@ -38,16 +54,96 @@ function getQuoteErrorMessage(error: unknown): string {
     return 'No quotation has been shared for this request yet.';
   }
   if (message.includes('quote_schema_missing')) {
-    return 'Quotation access is not configured on the server yet. Run migration 019 in Supabase.';
+    return 'Quotation access is not configured on the server yet. Run migrations 019–020 in Supabase.';
+  }
+  if (message.includes('waiting_for_sales')) {
+    return 'Please wait for Logistix Sales to respond to your negotiation request.';
+  }
+  if (message.includes('request_must_be_lower')) {
+    return 'Your requested amount must be lower than the current offer.';
+  }
+  if (message.includes('negotiation_closed') || message.includes('negotiation_not_allowed')) {
+    return 'This quotation can no longer be negotiated.';
   }
   return message || 'Unable to load quotation.';
 }
 
+function statusBanner(status: string): { title: string; body: string; tone: 'info' | 'warn' | 'ok' | 'bad' } {
+  switch (status) {
+    case 'awaiting_sales':
+      return {
+        title: 'Waiting for Sales Response',
+        body: 'Your negotiation request was sent. Sales will reply with a counter offer or decision.',
+        tone: 'warn',
+      };
+    case 'awaiting_customer':
+      return {
+        title: 'Your Response Required',
+        body: 'Sales sent an updated offer. Review the latest PDF and accept, negotiate again, or decline.',
+        tone: 'info',
+      };
+    case 'accepted':
+      return {
+        title: 'Quotation Accepted',
+        body: 'You accepted this offer. Logistix Sales has been notified.',
+        tone: 'ok',
+      };
+    case 'declined':
+      return {
+        title: 'Quotation Declined',
+        body: 'You declined this quotation. Sales has been notified.',
+        tone: 'bad',
+      };
+    default:
+      return {
+        title: 'Quotation ready',
+        body: 'Review the offer, open the PDF, then accept, negotiate, or decline.',
+        tone: 'info',
+      };
+  }
+}
+
+function historyTitle(item: NegotiationHistoryItem): string {
+  switch (item.eventType) {
+    case 'original_offer':
+      return 'Original offer';
+    case 'customer_request':
+      return 'Your request';
+    case 'sales_counter_sent':
+      return 'Counter offer';
+    case 'sales_accepted_request':
+      return 'Sales accepted your request';
+    case 'sales_rejected_request':
+      return 'Sales rejected request';
+    case 'customer_accepted':
+      return 'You accepted';
+    case 'customer_declined':
+      return 'You declined';
+    case 'resent_offer':
+      return 'Offer resent';
+    default:
+      return item.eventType.replace(/_/g, ' ');
+  }
+}
+
+function historyAmount(item: NegotiationHistoryItem): string {
+  if (item.requestedAmount != null) return formatMoney(item.requestedAmount);
+  if (item.offeredAmount != null) return formatMoney(item.offeredAmount);
+  return '—';
+}
+
 export default function InquiryQuoteScreen() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { sessionToken } = useAuth();
   const { id } = useLocalSearchParams<{ id: string }>();
   const inquiryId = Array.isArray(id) ? id[0] : id;
+
+  const [negotiateOpen, setNegotiateOpen] = useState(false);
+  const [declineOpen, setDeclineOpen] = useState(false);
+  const [requestedAmount, setRequestedAmount] = useState('');
+  const [negotiateMessage, setNegotiateMessage] = useState('');
+  const [declineReason, setDeclineReason] = useState('');
 
   const { data, isLoading, isError, error, refetch, isRefetching } = useQuery({
     queryKey: ['customer-quote', sessionToken, inquiryId],
@@ -60,6 +156,76 @@ export default function InquiryQuoteScreen() {
       return result.data;
     },
   });
+
+  const invalidate = async () => {
+    await queryClient.invalidateQueries({
+      queryKey: ['customer-quote', sessionToken, inquiryId],
+    });
+    await queryClient.invalidateQueries({ queryKey: ['customer-portal'] });
+  };
+
+  const negotiateMutation = useMutation({
+    mutationFn: async () => {
+      const amount = Number(requestedAmount);
+      if (!(amount > 0)) throw new Error('invalid_requested_amount');
+      const result = await submitQuotationNegotiation(
+        sessionToken!,
+        inquiryId!,
+        amount,
+        negotiateMessage,
+      );
+      if ('error' in result) throw result.error;
+    },
+    onSuccess: async () => {
+      setNegotiateOpen(false);
+      setRequestedAmount('');
+      setNegotiateMessage('');
+      await invalidate();
+      Alert.alert('Request sent', 'Sales will review your negotiation request.');
+    },
+    onError: (err) => {
+      Alert.alert('Unable to negotiate', getQuoteErrorMessage(err));
+    },
+  });
+
+  const acceptMutation = useMutation({
+    mutationFn: async () => {
+      const result = await acceptCustomerQuotation(sessionToken!, inquiryId!);
+      if ('error' in result) throw result.error;
+    },
+    onSuccess: async () => {
+      await invalidate();
+      Alert.alert('Accepted', 'You accepted this quotation. Sales has been notified.');
+    },
+    onError: (err) => {
+      Alert.alert('Unable to accept', getQuoteErrorMessage(err));
+    },
+  });
+
+  const declineMutation = useMutation({
+    mutationFn: async () => {
+      const result = await declineCustomerQuotation(
+        sessionToken!,
+        inquiryId!,
+        declineReason,
+      );
+      if ('error' in result) throw result.error;
+    },
+    onSuccess: async () => {
+      setDeclineOpen(false);
+      setDeclineReason('');
+      await invalidate();
+      Alert.alert('Declined', 'You declined this quotation. Sales has been notified.');
+    },
+    onError: (err) => {
+      Alert.alert('Unable to decline', getQuoteErrorMessage(err));
+    },
+  });
+
+  const banner = useMemo(
+    () => statusBanner(data?.status || 'quote_ready'),
+    [data?.status],
+  );
 
   if (isLoading && !data) {
     return (
@@ -88,16 +254,17 @@ export default function InquiryQuoteScreen() {
     );
   }
 
+  const showPrevious =
+    data.previousOfferAmount != null &&
+    data.totalAmount != null &&
+    data.previousOfferAmount !== data.totalAmount;
+
   return (
     <ScreenContainer
       title={data.quotationNumber || 'Quotation'}
       subtitle="Shared by Logistix"
       headerRight={
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.back()}
-          hitSlop={12}
-        >
+        <Pressable accessibilityRole="button" onPress={() => router.back()} hitSlop={12}>
           <Text style={styles.backLink}>Back</Text>
         </Pressable>
       }
@@ -110,32 +277,30 @@ export default function InquiryQuoteScreen() {
       ) : null}
 
       <FadeIn>
-        <Card>
-          <View style={styles.hero}>
-            <View style={styles.heroIcon}>
-              <Ionicons name="document-text-outline" size={28} color={colors.accent} />
-            </View>
-            <Text style={styles.heroTitle}>Your quotation is ready</Text>
-            <Text style={styles.heroBody}>
-              This is the same PDF generated by Logistix Sales. Open it to review the full
-              commercial offer.
-            </Text>
-          </View>
-        </Card>
+        <View
+          style={[
+            styles.banner,
+            banner.tone === 'warn' && styles.bannerWarn,
+            banner.tone === 'ok' && styles.bannerOk,
+            banner.tone === 'bad' && styles.bannerBad,
+          ]}
+        >
+          <Text style={styles.bannerTitle}>{banner.title}</Text>
+          <Text style={styles.bannerBody}>{banner.body}</Text>
+        </View>
       </FadeIn>
 
-      <FadeIn delay={60}>
-        <SectionHeader title="Summary" />
+      <FadeIn delay={40}>
+        <SectionHeader title="Current offer" />
         <Card>
           <FactRow label="Quote #" value={data.quotationNumber || '—'} />
-          <FactRow label="Total" value={formatMoney(data.totalAmount)} />
+          <FactRow label="Current offer" value={formatMoney(data.totalAmount)} />
+          {showPrevious ? (
+            <FactRow label="Previous offer" value={formatMoney(data.previousOfferAmount)} />
+          ) : null}
           <FactRow
-            label="Date"
-            value={
-              data.quotationDate
-                ? new Date(data.quotationDate).toLocaleDateString()
-                : '—'
-            }
+            label="Original offer"
+            value={formatMoney(data.originalOfferAmount ?? data.totalAmount)}
           />
           <FactRow
             label="Valid until"
@@ -144,15 +309,41 @@ export default function InquiryQuoteScreen() {
                 ? new Date(data.expirationDate).toLocaleDateString()
                 : '—'
             }
+            last
           />
-          <FactRow
-            label="Payment terms"
-            value={data.paymentTerms?.trim() || '—'}
-            last={!data.customerNotes?.trim()}
-          />
-          {data.customerNotes?.trim() ? (
-            <FactRow label="Notes" value={data.customerNotes.trim()} last />
-          ) : null}
+        </Card>
+      </FadeIn>
+
+      <FadeIn delay={80}>
+        <SectionHeader title="Negotiation history" />
+        <Card>
+          {data.history.length === 0 ? (
+            <Text style={styles.emptyHistory}>No negotiation activity yet.</Text>
+          ) : (
+            data.history.map((item, index) => (
+              <View
+                key={item.id || `${item.eventType}-${index}`}
+                style={[
+                  styles.historyRow,
+                  index < data.history.length - 1 && styles.historyBorder,
+                ]}
+              >
+                <View style={styles.historyTop}>
+                  <Text style={styles.historyTitle}>{historyTitle(item)}</Text>
+                  <Text style={styles.historyAmount}>{historyAmount(item)}</Text>
+                </View>
+                <Text style={styles.historyMeta}>
+                  {item.actorRole === 'customer' ? 'You' : 'Logistix'}
+                  {item.createdAt
+                    ? ` · ${new Date(item.createdAt).toLocaleString()}`
+                    : ''}
+                </Text>
+                {item.message ? (
+                  <Text style={styles.historyMessage}>“{item.message}”</Text>
+                ) : null}
+              </View>
+            ))
+          )}
         </Card>
       </FadeIn>
 
@@ -163,19 +354,120 @@ export default function InquiryQuoteScreen() {
           size="lg"
           onPress={() => void Linking.openURL(data.pdfUrl)}
         />
+        {data.canAccept ? (
+          <Button
+            label={`Accept ${formatMoney(data.totalAmount)}`}
+            fullWidth
+            loading={acceptMutation.isPending}
+            onPress={() => {
+              Alert.alert(
+                'Accept quotation',
+                `Accept ${formatMoney(data.totalAmount)} for ${data.quotationNumber}?`,
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Accept',
+                    onPress: () => acceptMutation.mutate(),
+                  },
+                ],
+              );
+            }}
+          />
+        ) : null}
+        {data.canNegotiate ? (
+          <Button
+            label="Negotiate"
+            variant="outline"
+            fullWidth
+            onPress={() => {
+              setRequestedAmount('');
+              setNegotiateMessage('');
+              setNegotiateOpen(true);
+            }}
+          />
+        ) : null}
+        {data.canDecline ? (
+          <Button
+            label="Decline"
+            variant="danger"
+            fullWidth
+            onPress={() => setDeclineOpen(true)}
+          />
+        ) : null}
         <Button
           label="Contact sales"
           variant="outline"
           fullWidth
           onPress={() => router.push(APP_ROUTES.support as Href)}
         />
-        <Button
-          label="Refresh"
-          variant="ghost"
-          fullWidth
-          onPress={() => refetch()}
-        />
+        <Button label="Refresh" variant="ghost" fullWidth onPress={() => refetch()} />
       </View>
+
+      <Modal visible={negotiateOpen} animationType="slide" transparent>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Negotiate quotation</Text>
+            <Text style={styles.modalBody}>
+              Current quotation: {formatMoney(data.totalAmount)}. Enter the amount you
+              would like Sales to consider. You cannot change quotation lines directly.
+            </Text>
+            <TextInput
+              label="Requested amount"
+              value={requestedAmount}
+              onChangeText={setRequestedAmount}
+              keyboardType="decimal-pad"
+              placeholder="e.g. 1650"
+            />
+            <TextInput
+              label="Message"
+              value={negotiateMessage}
+              onChangeText={setNegotiateMessage}
+              placeholder="Can you provide a better rate?"
+              multiline
+            />
+            <Button
+              label="Send Negotiation Request"
+              fullWidth
+              loading={negotiateMutation.isPending}
+              onPress={() => negotiateMutation.mutate()}
+            />
+            <Button
+              label="Cancel"
+              variant="ghost"
+              fullWidth
+              onPress={() => setNegotiateOpen(false)}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={declineOpen} animationType="slide" transparent>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Decline quotation</Text>
+            <TextInput
+              label="Reason (optional)"
+              value={declineReason}
+              onChangeText={setDeclineReason}
+              placeholder="Price is too high"
+              multiline
+            />
+            <Button
+              label="Decline quotation"
+              variant="danger"
+              fullWidth
+              loading={declineMutation.isPending}
+              onPress={() => declineMutation.mutate()}
+            />
+            <Button
+              label="Cancel"
+              variant="ghost"
+              fullWidth
+              onPress={() => setDeclineOpen(false)}
+            />
+          </View>
+        </View>
+      </Modal>
     </ScreenContainer>
   );
 }
@@ -220,58 +512,111 @@ const styles = StyleSheet.create({
   },
   refreshText: {
     ...typography.caption,
-    color: colors.textMuted,
+    color: colors.textSecondary,
   },
-  hero: {
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.sm,
+  banner: {
+    backgroundColor: colors.infoLight,
+    borderRadius: radius.md,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  heroIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.accentLight,
-    alignItems: 'center',
-    justifyContent: 'center',
+  bannerWarn: {
+    backgroundColor: colors.warningLight,
+  },
+  bannerOk: {
+    backgroundColor: colors.successLight,
+  },
+  bannerBad: {
+    backgroundColor: colors.errorLight,
+  },
+  bannerTitle: {
+    ...typography.label,
+    color: colors.text,
     marginBottom: spacing.xs,
   },
-  heroTitle: {
-    ...typography.h3,
-    color: colors.text,
-    textAlign: 'center',
-  },
-  heroBody: {
+  bannerBody: {
     ...typography.bodySmall,
     color: colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 20,
   },
   factRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.md,
   },
   factBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
   },
   factLabel: {
     ...typography.caption,
     color: colors.textMuted,
-    width: 110,
-    flexShrink: 0,
-    paddingTop: 2,
+    marginBottom: 4,
   },
   factValue: {
     ...typography.body,
     color: colors.text,
+    fontWeight: '600',
+  },
+  emptyHistory: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+    paddingVertical: spacing.sm,
+  },
+  historyRow: {
+    paddingVertical: spacing.md,
+  },
+  historyBorder: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  historyTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  historyTitle: {
+    ...typography.label,
+    color: colors.text,
     flex: 1,
-    minWidth: 0,
+  },
+  historyAmount: {
+    ...typography.label,
+    color: colors.accent,
+  },
+  historyMeta: {
+    ...typography.caption,
+    color: colors.textMuted,
+    marginTop: 4,
+  },
+  historyMessage: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+    marginTop: spacing.sm,
+    fontStyle: 'italic',
   },
   actions: {
     gap: spacing.md,
-    marginTop: spacing.lg,
+    marginTop: spacing.xl,
+    marginBottom: spacing.huge,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: colors.overlay,
+    justifyContent: 'flex-end',
+  },
+  modalCard: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    padding: spacing.xxl,
+    gap: spacing.md,
+  },
+  modalTitle: {
+    ...typography.h3,
+    color: colors.text,
+  },
+  modalBody: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
   },
 });

@@ -16,6 +16,10 @@ export {
 } from './attachments';
 export {
   fetchCustomerQuoteBySession,
+  submitQuotationNegotiation,
+  acceptCustomerQuotation,
+  declineCustomerQuotation,
   type CustomerQuote,
   type CustomerQuoteResult,
+  type NegotiationHistoryItem,
 } from './customer-quote';
