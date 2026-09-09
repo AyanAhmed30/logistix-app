@@ -19,7 +19,8 @@ export function useAssignedSalesAgent(sessionToken: string | undefined | null) {
       }
       return result.data;
     },
-    staleTime: 60_000,
+    staleTime: 15_000,
+    refetchOnMount: 'always',
   });
 
   useFocusEffect(
