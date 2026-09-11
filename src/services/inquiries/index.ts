@@ -8,6 +8,12 @@ export {
   type SubmitCustomerInquiryResult,
 } from './submit';
 export {
+  saveCustomerInquiryDraft,
+  submitCustomerInquiryDraft,
+  type SaveCustomerInquiryDraftInput,
+  type SavedInquiryDraft,
+} from './draft';
+export {
   MAX_CUSTOMER_ATTACHMENTS,
   uploadCustomerInquiryAttachments,
   splitUploadedAttachments,

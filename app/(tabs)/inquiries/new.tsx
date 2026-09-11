@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
-import { useRouter, type Href } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Image,
   Pressable,
@@ -14,20 +15,26 @@ import {
 
 import { ErrorBanner } from '@/components/auth';
 import { Button, FadeIn, ProgressBar, ScreenContainer, TextInput } from '@/components/ui';
+import { INQUIRY_WIZARD_STEPS, clampInquiryWizardStep } from '@/constants/inquiry-form';
 import { colors, radius, shadows, spacing, typography } from '@/constants/theme';
 import { queryClient } from '@/lib/query-client';
 import { APP_ROUTES, AUTH_ROUTES } from '@/navigation/routes';
 import { useAuth } from '@/providers';
+import { useCustomerPortal } from '@/hooks/useCustomerPortal';
 import {
   MAX_CUSTOMER_ATTACHMENTS,
   isImageAttachment,
+  saveCustomerInquiryDraft,
   splitUploadedAttachments,
   submitCustomerInquiry,
+  submitCustomerInquiryDraft,
   uploadCustomerInquiryAttachments,
   type LocalAttachment,
 } from '@/services/inquiries';
+import { isDraftInquiry } from '@/utils/home-dashboard';
+import { attachmentsFromInquiry } from '@/utils/inquiry-media';
 
-const STEPS = ['Product', 'Cargo', 'Notes', 'Review'] as const;
+const STEPS = INQUIRY_WIZARD_STEPS;
 
 type FormState = {
   productName: string;
@@ -70,6 +77,12 @@ function getSubmitErrorMessage(error: unknown): string {
   if (lower.includes('cbm_invalid')) {
     return 'CBM must be a valid number (e.g. 12.5).';
   }
+  if (lower.includes('draft_not_found')) {
+    return 'This draft is no longer available. Start a new request or pick another draft.';
+  }
+  if (lower.includes('draft_schema_missing')) {
+    return 'Drafts are not configured on the server yet. Run migration 033 in Supabase.';
+  }
   if (lower.includes('upload_policy_missing') || lower.includes('submit_schema_missing')) {
     return 'Attachments are not configured on the server yet. Run migration 018 in Supabase.';
   }
@@ -80,23 +93,186 @@ function makeAttachmentId() {
   return `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function attachmentsToPayload(uploaded: { url: string; name: string; kind: 'image' | 'file' }[]) {
+  const { imageUrl, additionalImageUrls } = splitUploadedAttachments(uploaded);
+  return {
+    imageUrl,
+    additionalImageUrls,
+    draftAttachments: uploaded.map((item) => ({
+      url: item.url,
+      name: item.name,
+      kind: item.kind,
+    })),
+  };
+}
+
 export default function NewRequestScreen() {
   const router = useRouter();
   const { sessionToken } = useAuth();
+  const params = useLocalSearchParams<{ draftId?: string; mode?: string; t?: string }>();
+  const paramDraftId = Array.isArray(params.draftId) ? params.draftId[0] : params.draftId;
+  const paramMode = Array.isArray(params.mode) ? params.mode[0] : params.mode;
+  const freshKey = Array.isArray(params.t) ? params.t[0] : params.t;
+  const selectedDraftId = paramDraftId?.trim() || '';
+  const mode: 'new' | 'edit_draft' =
+    paramMode === 'edit' && selectedDraftId ? 'edit_draft' : 'new';
+  const { data: portalData } = useCustomerPortal(sessionToken);
+
+  const [draftId, setDraftId] = useState<string | null>(mode === 'edit_draft' ? selectedDraftId : null);
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<FormState>(EMPTY);
   const [attachments, setAttachments] = useState<LocalAttachment[]>([]);
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [hydratedDraftId, setHydratedDraftId] = useState<string | null>(null);
+  const skipAutosaveRef = useRef(true);
+  const draftIdRef = useRef<string | null>(draftId);
+  const persistInFlightRef = useRef(false);
   const [success, setSuccess] = useState<{
     inquiryId: string;
     inquiryNumber: string;
     message: string;
   } | null>(null);
 
+  draftIdRef.current = draftId;
+
   const progress = useMemo(() => ((step + 1) / STEPS.length) * 100, [step]);
   const remainingSlots = MAX_CUSTOMER_ATTACHMENTS - attachments.length;
+  const busy = submitting || savingDraft;
+
+  const resetToNewRequest = () => {
+    skipAutosaveRef.current = true;
+    draftIdRef.current = null;
+    setDraftId(null);
+    setStep(0);
+    setForm(EMPTY);
+    setAttachments([]);
+    setErrors({});
+    setFormError(null);
+    setHydratedDraftId(null);
+    setSubmitting(false);
+    setSavingDraft(false);
+    setSuccess(null);
+  };
+
+  useEffect(() => {
+    if (mode !== 'new') return;
+    resetToNewRequest();
+  }, [mode, selectedDraftId, freshKey]);
+
+  useEffect(() => {
+    if (mode !== 'edit_draft' || !selectedDraftId) return;
+    if (hydratedDraftId === selectedDraftId) return;
+    const draft = portalData?.inquiries.find(
+      (row) => row.id === selectedDraftId && isDraftInquiry(row),
+    );
+    if (!draft) return;
+
+    skipAutosaveRef.current = true;
+    draftIdRef.current = draft.id;
+    setDraftId(draft.id);
+    setForm({
+      productName: draft.productName ?? '',
+      quantity: draft.quantity ?? '',
+      totalWeight: draft.totalWeight ?? '',
+      cbm: draft.cbm ?? '',
+      notes: draft.description ?? '',
+    });
+    setAttachments(
+      attachmentsFromInquiry(draft).map((item) => ({
+        id: makeAttachmentId(),
+        uri: item.url,
+        name: item.name,
+        mimeType: item.kind === 'image' ? 'image/jpeg' : 'application/octet-stream',
+        kind: item.kind,
+        remoteUrl: item.url,
+      })),
+    );
+    setStep(clampInquiryWizardStep(draft.draftStep));
+    setErrors({});
+    setFormError(null);
+    setSuccess(null);
+    setHydratedDraftId(draft.id);
+  }, [mode, selectedDraftId, portalData?.inquiries, hydratedDraftId]);
+
+  const persistDraft = async (saveKind: 'explicit' | 'auto') => {
+    if (!sessionToken) {
+      return { ok: false as const, error: 'Your session expired. Please sign in again.' };
+    }
+
+    const uploadResult = await uploadCustomerInquiryAttachments(attachments);
+    if (uploadResult.error || !uploadResult.data) {
+      return {
+        ok: false as const,
+        error: getSubmitErrorMessage(uploadResult.error),
+      };
+    }
+
+    const uploaded = uploadResult.data;
+    const payload = attachmentsToPayload(uploaded);
+    const result = await saveCustomerInquiryDraft({
+      sessionToken,
+      inquiryId: mode === 'edit_draft' ? selectedDraftId || draftIdRef.current : null,
+      productName: form.productName,
+      quantity: form.quantity,
+      totalWeight: form.totalWeight,
+      cbm: form.cbm,
+      description: form.notes,
+      imageUrl: payload.imageUrl,
+      additionalImageUrls: payload.additionalImageUrls,
+      draftStep: step,
+      draftAttachments: payload.draftAttachments,
+    });
+
+    if (result.error || !result.data) {
+      return { ok: false as const, error: getSubmitErrorMessage(result.error) };
+    }
+
+    setDraftId(result.data.inquiryId);
+    draftIdRef.current = result.data.inquiryId;
+    setAttachments((prev) =>
+      prev.map((item, index) => ({
+        ...item,
+        remoteUrl: uploaded[index]?.url ?? item.remoteUrl,
+        uri: uploaded[index]?.url ?? item.uri,
+      })),
+    );
+    if (saveKind === 'explicit') {
+      await queryClient.invalidateQueries({ queryKey: ['customer-portal'] });
+      await queryClient.refetchQueries({ queryKey: ['customer-portal'] });
+    }
+    return { ok: true as const, message: result.data.message, mode: saveKind };
+  };
+
+  const persistDraftGuarded = async (saveKind: 'explicit' | 'auto') => {
+    if (saveKind === 'auto' && persistInFlightRef.current) {
+      return { ok: true as const, message: '', mode: saveKind };
+    }
+    persistInFlightRef.current = true;
+    try {
+      return await persistDraft(saveKind);
+    } finally {
+      persistInFlightRef.current = false;
+    }
+  };
+
+  useEffect(() => {
+    if (mode !== 'edit_draft' || !draftId || submitting || savingDraft || success) return;
+    if (skipAutosaveRef.current) {
+      skipAutosaveRef.current = false;
+      return;
+    }
+    const timer = setTimeout(() => {
+      void persistDraftGuarded('auto').then((result) => {
+        if (!result.ok) setFormError(result.error);
+      });
+    }, 2500);
+    return () => clearTimeout(timer);
+    // Autosave the same draft when the customer pauses after edits.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form, step, attachments, draftId]);
 
   const update = (key: keyof FormState, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -212,6 +388,26 @@ export default function NewRequestScreen() {
     void submit();
   };
 
+  const saveDraft = async () => {
+    setSavingDraft(true);
+    setFormError(null);
+    const result = await persistDraftGuarded('explicit');
+    setSavingDraft(false);
+
+    if (!result.ok) {
+      setFormError(result.error);
+      if (result.error.toLowerCase().includes('session expired')) {
+        Alert.alert('Session expired', result.error, [
+          { text: 'Sign in', onPress: () => router.replace(AUTH_ROUTES.login as Href) },
+        ]);
+      }
+      return;
+    }
+
+    resetToNewRequest();
+    router.replace(APP_ROUTES.inquiryDrafts as Href);
+  };
+
   const submit = async () => {
     if (!sessionToken) {
       setFormError('Your session expired. Please sign in again.');
@@ -229,17 +425,30 @@ export default function NewRequestScreen() {
     }
 
     const { imageUrl, additionalImageUrls } = splitUploadedAttachments(uploadResult.data);
+    const currentDraftId = draftIdRef.current;
 
-    const result = await submitCustomerInquiry({
-      sessionToken,
-      productName: form.productName,
-      quantity: form.quantity,
-      totalWeight: form.totalWeight,
-      cbm: form.cbm,
-      description: form.notes,
-      imageUrl,
-      additionalImageUrls,
-    });
+    const result = currentDraftId
+      ? await submitCustomerInquiryDraft({
+          sessionToken,
+          inquiryId: currentDraftId,
+          productName: form.productName,
+          quantity: form.quantity,
+          totalWeight: form.totalWeight,
+          cbm: form.cbm,
+          description: form.notes,
+          imageUrl,
+          additionalImageUrls,
+        })
+      : await submitCustomerInquiry({
+          sessionToken,
+          productName: form.productName,
+          quantity: form.quantity,
+          totalWeight: form.totalWeight,
+          cbm: form.cbm,
+          description: form.notes,
+          imageUrl,
+          additionalImageUrls,
+        });
 
     setSubmitting(false);
 
@@ -296,9 +505,35 @@ export default function NewRequestScreen() {
     );
   }
 
+  if (mode === 'edit_draft' && hydratedDraftId !== selectedDraftId) {
+    const missing =
+      Boolean(portalData) &&
+      !portalData?.inquiries.some((row) => row.id === selectedDraftId && isDraftInquiry(row));
+
+    return (
+      <ScreenContainer title="Continue draft" subtitle={missing ? 'Not found' : 'Loading…'}>
+        {missing ? (
+          <View style={styles.form}>
+            <ErrorBanner message="This draft is no longer available." />
+            <Button
+              label="Back to Draft Requests"
+              fullWidth
+              onPress={() => router.replace(APP_ROUTES.inquiryDrafts as Href)}
+            />
+          </View>
+        ) : (
+          <View style={styles.form}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.reviewHint}>Loading your saved request…</Text>
+          </View>
+        )}
+      </ScreenContainer>
+    );
+  }
+
   return (
     <ScreenContainer
-      title="New request"
+      title={mode === 'edit_draft' ? 'Continue draft' : 'New request'}
       subtitle={`Step ${step + 1} of ${STEPS.length}: ${STEPS[step]}`}
       headerRight={
         <Pressable accessibilityRole="button" onPress={() => router.back()} hitSlop={12}>
@@ -407,7 +642,7 @@ export default function NewRequestScreen() {
                   <Pressable
                     accessibilityRole="button"
                     onPress={() => void pickImages()}
-                    disabled={remainingSlots <= 0 || submitting}
+                    disabled={remainingSlots <= 0 || busy}
                     style={({ pressed }) => [
                       styles.attachButton,
                       pressed && styles.attachButtonPressed,
@@ -420,7 +655,7 @@ export default function NewRequestScreen() {
                   <Pressable
                     accessibilityRole="button"
                     onPress={() => void pickFiles()}
-                    disabled={remainingSlots <= 0 || submitting}
+                    disabled={remainingSlots <= 0 || busy}
                     style={({ pressed }) => [
                       styles.attachButton,
                       pressed && styles.attachButtonPressed,
@@ -495,7 +730,7 @@ export default function NewRequestScreen() {
             variant="outline"
             fullWidth
             onPress={() => setStep((s) => s - 1)}
-            disabled={submitting}
+            disabled={busy}
           />
         ) : null}
         <Button
@@ -503,7 +738,16 @@ export default function NewRequestScreen() {
           fullWidth
           size="lg"
           loading={submitting}
+          disabled={busy && !submitting}
           onPress={goNext}
+        />
+        <Button
+          label="Save as Draft"
+          variant="outline"
+          fullWidth
+          loading={savingDraft}
+          disabled={busy && !savingDraft}
+          onPress={() => void saveDraft()}
         />
       </View>
     </ScreenContainer>

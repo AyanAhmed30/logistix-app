@@ -6,6 +6,12 @@ export type CustomerLead = {
   createdAt: string;
 };
 
+export type InquiryDraftAttachment = {
+  url: string;
+  name: string;
+  kind: 'image' | 'file';
+};
+
 export type CustomerInquiry = {
   id: string;
   leadId: string;
@@ -29,6 +35,9 @@ export type CustomerInquiry = {
   customerSubmitted?: boolean;
   approvalStatus?: string | null;
   sentToAccounting?: boolean;
+  isDraft?: boolean;
+  draftStep?: number;
+  draftAttachments?: InquiryDraftAttachment[];
   hasQuote?: boolean;
   quoteTotal?: number | null;
   quoteNumber?: string | null;

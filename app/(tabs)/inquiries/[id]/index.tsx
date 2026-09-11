@@ -1,4 +1,5 @@
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
+import { useEffect } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { InquiryAttachments, InquiryImageGallery } from '@/components/inquiry';
@@ -24,6 +25,7 @@ import { buildInquiryTimeline, displayOrDash } from '@/utils/inquiry-detail';
 import { getCustomerStatusVisual } from '@/utils/customer-status-ui';
 import { getInquiryDocumentUrls, getInquiryImageUrls } from '@/utils/inquiry-media';
 import { getPortalErrorMessage } from '@/utils/inquiry-portal-errors';
+import { isDraftInquiry } from '@/utils/home-dashboard';
 
 export default function RequestDetailScreen() {
   const router = useRouter();
@@ -34,6 +36,12 @@ export default function RequestDetailScreen() {
   const { data, isLoading, isError, error, refetch, isRefetching } = useCustomerPortal(sessionToken);
 
   const inquiry = data?.inquiries.find((row) => row.id === requestId);
+
+  useEffect(() => {
+    if (inquiry && isDraftInquiry(inquiry)) {
+      router.replace(APP_ROUTES.inquiryDraft(inquiry.id) as Href);
+    }
+  }, [inquiry, router]);
 
   if (isLoading && !data) {
     return (
@@ -70,6 +78,16 @@ export default function RequestDetailScreen() {
           actionLabel="Back to requests"
           onActionPress={() => router.replace(APP_ROUTES.inquiries as Href)}
         />
+      </ScreenContainer>
+    );
+  }
+
+  if (inquiry && isDraftInquiry(inquiry)) {
+    return (
+      <ScreenContainer title="Draft" subtitle="Opening saved request…">
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
       </ScreenContainer>
     );
   }

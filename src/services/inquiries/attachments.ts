@@ -11,6 +11,8 @@ export type LocalAttachment = {
   mimeType: string;
   size?: number | null;
   kind: 'image' | 'file';
+  /** Public URL after a successful upload — skip re-upload on draft save. */
+  remoteUrl?: string | null;
 };
 
 export type UploadedAttachment = {
@@ -73,6 +75,17 @@ async function readUriAsArrayBuffer(uri: string): Promise<ArrayBuffer> {
 export async function uploadCustomerInquiryAttachment(
   attachment: LocalAttachment,
 ): Promise<{ data: UploadedAttachment | null; error: Error | null }> {
+  if (attachment.remoteUrl?.trim()) {
+    return {
+      data: {
+        url: attachment.remoteUrl.trim(),
+        name: attachment.name,
+        kind: isImageAttachment(attachment) ? 'image' : 'file',
+      },
+      error: null,
+    };
+  }
+
   try {
     if (!isSupabaseConfigured()) {
       return {

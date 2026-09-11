@@ -16,13 +16,14 @@ import {
 } from '@/constants/customer-status';
 import { colors, radius, shadows, spacing, typography } from '@/constants/theme';
 import { useCustomerPortal } from '@/hooks/useCustomerPortal';
-import { APP_ROUTES } from '@/navigation/routes';
+import { APP_ROUTES, newRequestHref } from '@/navigation/routes';
 import { useAuth } from '@/providers';
 import { getCustomerStatusVisual } from '@/utils/customer-status-ui';
 import {
   deriveHomeActions,
   getActivePortalInquiries,
   getInquiryCustomerStatus,
+  isDraftInquiry,
 } from '@/utils/home-dashboard';
 import { getPortalErrorMessage } from '@/utils/inquiry-portal-errors';
 
@@ -46,6 +47,7 @@ export default function CustomerHomeScreen() {
   const completedCount = useMemo(
     () =>
       inquiries.filter((inq) => {
+        if (isDraftInquiry(inq)) return false;
         const status = getInquiryCustomerStatus(inq);
         return status === 'completed';
       }).length,
@@ -145,9 +147,16 @@ export default function CustomerHomeScreen() {
                 key={item.id}
                 item={item}
                 onPress={() => {
-                  if (item.requestId) {
-                    router.push(APP_ROUTES.inquiryDetail(item.requestId) as Href);
+                  if (!item.requestId) return;
+                  if (item.id.startsWith('draft-')) {
+                    router.push(APP_ROUTES.inquiryDraft(item.requestId) as Href);
+                    return;
                   }
+                  if (item.type === 'quote') {
+                    router.push(APP_ROUTES.inquiryQuote(item.requestId) as Href);
+                    return;
+                  }
+                  router.push(APP_ROUTES.inquiryDetail(item.requestId) as Href);
                 }}
               />
             ))}
@@ -216,7 +225,7 @@ export default function CustomerHomeScreen() {
           <QuickTile
             icon="add-circle-outline"
             label="New request"
-            onPress={() => router.push(APP_ROUTES.inquiryNew as Href)}
+            onPress={() => router.push(newRequestHref() as Href)}
           />
           <QuickTile
             icon="document-text-outline"

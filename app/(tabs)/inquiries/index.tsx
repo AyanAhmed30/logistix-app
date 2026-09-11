@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 
+import { RequestsSubNav } from '@/components/inquiry';
 import { EmptyState, FadeIn, FilterChips, ScreenContainer } from '@/components/ui';
 import {
   matchesRequestFilter,
@@ -21,11 +22,12 @@ import {
 import { colors, radius, shadows, spacing, typography } from '@/constants/theme';
 import { mockRequests } from '@/data/mock/customer';
 import { useCustomerPortal } from '@/hooks/useCustomerPortal';
-import { APP_ROUTES } from '@/navigation/routes';
+import { APP_ROUTES, newRequestHref } from '@/navigation/routes';
 import { useAuth } from '@/providers';
 import { CustomerInquiry } from '@/types/inquiry';
 import { CustomerStatusKey, MockRequest } from '@/types/customer';
 import { getCustomerStatusVisual } from '@/utils/customer-status-ui';
+import { getDraftInquiries, isDraftInquiry } from '@/utils/home-dashboard';
 import { getPortalErrorMessage } from '@/utils/inquiry-portal-errors';
 
 type ListItem = {
@@ -86,16 +88,21 @@ export default function InquiriesScreen() {
   }, [data?.leads]);
 
   const liveInquiries = data?.inquiries ?? [];
+  const draftItems = useMemo(() => getDraftInquiries(liveInquiries), [liveInquiries]);
+  const submittedInquiries = useMemo(
+    () => liveInquiries.filter((inquiry) => !isDraftInquiry(inquiry)),
+    [liveInquiries],
+  );
   // Demo samples only in development — never in production empty states (Step 2 P0).
-  const usingDemo = __DEV__ && !isLoading && !isError && liveInquiries.length === 0;
+  const usingDemo = __DEV__ && !isLoading && !isError && submittedInquiries.length === 0 && draftItems.length === 0;
 
   const items = useMemo(() => {
     const sourceItems = usingDemo
       ? mockRequests.map(mockToListItem)
-      : liveInquiries.map(liveToListItem);
+      : submittedInquiries.map(liveToListItem);
 
     return sourceItems.filter((item) => matchesRequestFilter(item.status, filter));
-  }, [filter, liveInquiries, usingDemo]);
+  }, [filter, submittedInquiries, usingDemo]);
 
   return (
     <ScreenContainer
@@ -103,7 +110,7 @@ export default function InquiriesScreen() {
       title="Requests"
       subtitle={
         leadSummary
-          ? `Lead #${leadSummary.leadNumber ?? '—'} · ${liveInquiries.length} request${liveInquiries.length === 1 ? '' : 's'}`
+          ? `Lead #${leadSummary.leadNumber ?? '—'} · ${submittedInquiries.length} request${submittedInquiries.length === 1 ? '' : 's'}`
           : usingDemo
             ? 'Demo requests for exploration'
             : 'Freight requests linked to your phone'
@@ -112,7 +119,7 @@ export default function InquiriesScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="New request"
-          onPress={() => router.push(APP_ROUTES.inquiryNew as Href)}
+          onPress={() => router.push(newRequestHref() as Href)}
           style={({ pressed }) => [styles.headerBtn, pressed && { opacity: 0.85 }]}
         >
           <Ionicons name="add" size={22} color={colors.surface} />
@@ -134,6 +141,7 @@ export default function InquiriesScreen() {
         />
       ) : (
         <View style={styles.body}>
+          <RequestsSubNav active="requests" />
           <FilterChips
             chips={REQUEST_FILTER_OPTIONS}
             selectedId={filter}
@@ -166,6 +174,25 @@ export default function InquiriesScreen() {
               </FadeIn>
             ) : null}
 
+            {draftItems.length > 0 ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => router.push(APP_ROUTES.inquiryDrafts as Href)}
+                style={({ pressed }) => [styles.draftBanner, pressed && { opacity: 0.92 }]}
+              >
+                <View style={styles.draftBannerText}>
+                  <Text style={styles.draftHeading}>Draft Requests</Text>
+                  <Text style={styles.draftHint}>
+                    {draftItems.length === 1
+                      ? '1 draft waiting to be finished'
+                      : `${draftItems.length} drafts waiting to be finished`}
+                  </Text>
+                </View>
+                <Text style={styles.viewLink}>View</Text>
+                <Ionicons name="chevron-forward" size={16} color={colors.accent} />
+              </Pressable>
+            ) : null}
+
             {usingDemo ? (
               <View style={styles.demoBanner}>
                 <Ionicons name="sparkles-outline" size={16} color={colors.accentDark} />
@@ -175,19 +202,21 @@ export default function InquiriesScreen() {
               </View>
             ) : null}
 
-            {items.length === 0 ? (
+            {items.length === 0 && (usingDemo || draftItems.length === 0) ? (
               <EmptyState
                 icon="document-text-outline"
-                title={usingDemo ? 'No demo matches' : 'No requests yet'}
+                title={usingDemo ? 'No demo matches' : 'No submitted requests'}
                 description={
                   usingDemo
                     ? 'Try another filter, or create a new request to explore the flow.'
                     : leadSummary
-                      ? 'When your sales agent sends freight requests for your lead, they will appear here.'
+                      ? draftItems.length > 0
+                        ? 'You have drafts above. Submitted requests will appear here.'
+                        : 'When your sales agent sends freight requests for your lead, they will appear here.'
                       : 'No lead was found for your phone yet. Ask your sales agent to confirm the lead phone matches your account. Pull down to refresh.'
                 }
                 actionLabel="New request"
-                onActionPress={() => router.push(APP_ROUTES.inquiryNew as Href)}
+                onActionPress={() => router.push(newRequestHref() as Href)}
               />
             ) : (
               <View style={styles.list}>
@@ -237,7 +266,7 @@ export default function InquiriesScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="New freight request"
-            onPress={() => router.push(APP_ROUTES.inquiryNew as Href)}
+            onPress={() => router.push(newRequestHref() as Href)}
             style={({ pressed }) => [styles.fab, pressed && { opacity: 0.9 }]}
           >
             <Ionicons name="add" size={26} color={colors.surface} />
@@ -322,6 +351,31 @@ const styles = StyleSheet.create({
   },
   list: {
     gap: spacing.md,
+  },
+  draftBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    ...shadows.sm,
+  },
+  draftBannerText: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  draftHeading: {
+    ...typography.label,
+    color: colors.text,
+    fontSize: 15,
+  },
+  draftHint: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
   },
   card: {
     backgroundColor: colors.surface,

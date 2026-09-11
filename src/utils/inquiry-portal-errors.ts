@@ -20,6 +20,10 @@ export function getPortalErrorMessage(error: unknown): string {
     return 'Missing Supabase configuration. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY in .env.';
   }
 
+  if (lower.includes('draft_schema_missing')) {
+    return 'Drafts are not configured on the server yet. Run the latest Supabase migrations.';
+  }
+
   if (
     lower.includes('network_request_failed') ||
     lower.includes('failed to fetch') ||

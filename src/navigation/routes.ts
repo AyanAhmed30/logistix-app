@@ -12,7 +12,10 @@ export const APP_ROUTES = {
   tabs: '/(tabs)',
   home: '/(tabs)',
   inquiries: '/(tabs)/inquiries',
-  inquiryNew: '/(tabs)/inquiries/new',
+  inquiryDrafts: '/(tabs)/inquiries/drafts',
+  inquiryNew: '/(tabs)/inquiries/new?mode=new',
+  inquiryDraft: (id: string) =>
+    `/(tabs)/inquiries/new?mode=edit&draftId=${encodeURIComponent(id)}` as const,
   inquiryDetail: (id: string) => `/(tabs)/inquiries/${id}` as const,
   inquiryQuote: (id: string) => `/(tabs)/inquiries/${id}/quote` as const,
   orders: '/(tabs)/orders',
@@ -26,3 +29,8 @@ export const APP_ROUTES = {
 } as const;
 
 export type AuthRoute = (typeof AUTH_ROUTES)[keyof typeof AUTH_ROUTES];
+
+/** Always opens a blank request form (unique query so Expo Router cannot reuse a filled instance). */
+export function newRequestHref() {
+  return `/(tabs)/inquiries/new?mode=new&t=${Date.now()}` as const;
+}

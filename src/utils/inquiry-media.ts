@@ -1,4 +1,4 @@
-import { CustomerInquiry } from '@/types/inquiry';
+import { CustomerInquiry, InquiryDraftAttachment } from '@/types/inquiry';
 
 const IMAGE_EXTENSIONS = /\.(png|jpe?g|gif|webp|bmp|svg)(\?.*)?$/i;
 
@@ -11,6 +11,37 @@ export function parseAdditionalImageUrls(value: unknown): string[] {
     .filter((item): item is string => typeof item === 'string')
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+export function parseDraftAttachments(value: unknown): InquiryDraftAttachment[] {
+  if (!Array.isArray(value)) return [];
+
+  const out: InquiryDraftAttachment[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== 'object') continue;
+    const row = item as { url?: unknown; name?: unknown; kind?: unknown };
+    const url = typeof row.url === 'string' ? row.url.trim() : '';
+    if (!url) continue;
+    const name = typeof row.name === 'string' && row.name.trim() ? row.name.trim() : url;
+    const kind: InquiryDraftAttachment['kind'] =
+      row.kind === 'file' ? 'file' : row.kind === 'image' ? 'image' : isLikelyImageUrl(url) ? 'image' : 'file';
+    out.push({ url, name, kind });
+  }
+  return out;
+}
+
+export function attachmentsFromInquiry(
+  inquiry: Pick<CustomerInquiry, 'imageUrl' | 'additionalImageUrls' | 'draftAttachments'>,
+): InquiryDraftAttachment[] {
+  if (inquiry.draftAttachments && inquiry.draftAttachments.length > 0) {
+    return inquiry.draftAttachments;
+  }
+
+  return getInquiryAttachmentUrls(inquiry).map((url) => ({
+    url,
+    name: decodeURIComponent(url.split('/').pop()?.split('?')[0] || 'attachment'),
+    kind: isLikelyImageUrl(url) ? 'image' : 'file',
+  }));
 }
 
 export function getInquiryAttachmentUrls(

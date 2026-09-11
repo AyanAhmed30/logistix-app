@@ -2,7 +2,7 @@ import { PostgrestError } from '@supabase/supabase-js';
 
 import { getSupabase, isSupabaseConfigured } from '@/services/supabase';
 import { CustomerInquiry, CustomerLead, CustomerPortalData } from '@/types/inquiry';
-import { parseAdditionalImageUrls } from '@/utils/inquiry-media';
+import { parseAdditionalImageUrls, parseDraftAttachments } from '@/utils/inquiry-media';
 
 export type CustomerPortalResult = {
   data: CustomerPortalData | null;
@@ -40,6 +40,9 @@ type RpcInquiryRow = {
   customer_submitted?: boolean;
   approval_status?: string | null;
   sent_to_accounting?: boolean;
+  is_draft?: boolean;
+  draft_step?: number | null;
+  draft_attachments?: unknown;
   has_quote?: boolean;
   quote_total?: number | string | null;
   quote_number?: string | null;
@@ -85,6 +88,11 @@ function toInquiry(row: RpcInquiryRow): CustomerInquiry {
     customerSubmitted: Boolean(row.customer_submitted),
     approvalStatus: row.approval_status ?? null,
     sentToAccounting: Boolean(row.sent_to_accounting),
+    isDraft:
+      Boolean(row.is_draft) ||
+      (String(row.status || '').toLowerCase() === 'draft' && !row.customer_submitted),
+    draftStep: Number(row.draft_step ?? 0) || 0,
+    draftAttachments: parseDraftAttachments(row.draft_attachments),
     hasQuote: Boolean(row.has_quote),
     quoteTotal:
       row.quote_total === null || row.quote_total === undefined
