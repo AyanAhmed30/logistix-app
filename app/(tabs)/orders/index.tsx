@@ -64,6 +64,7 @@ export default function OrdersScreen() {
     <ScreenContainer
       title="Orders"
       subtitle={`${mockOrders.length} shipments · ${mockCustomer.companyName}`}
+      showNotificationBell
     >
       <SearchBar
         value={search}

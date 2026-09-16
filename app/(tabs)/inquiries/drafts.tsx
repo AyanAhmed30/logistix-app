@@ -24,6 +24,7 @@ export default function DraftRequestsScreen() {
       subtitle={
         drafts.length === 1 ? '1 saved draft' : `${drafts.length} saved drafts`
       }
+      showNotificationBell
       headerRight={
         <Pressable
           accessibilityRole="button"

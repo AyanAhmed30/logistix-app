@@ -9,6 +9,7 @@ export { FadeIn } from './FadeIn';
 export { FilterChips } from './FilterChips';
 export { MapPlaceholder } from './MapPlaceholder';
 export { MenuListItem } from './MenuListItem';
+export { NotificationBellButton, getUnreadNotificationCount } from './NotificationBellButton';
 export { OrderListItem } from './OrderListItem';
 export { ProgressBar } from './ProgressBar';
 export { QuickAction } from './QuickAction';

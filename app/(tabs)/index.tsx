@@ -89,16 +89,7 @@ export default function CustomerHomeScreen() {
     <ScreenContainer
       title={`${greetingForNow()}, ${firstName}`}
       subtitle={subtitle}
-      headerRight={
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Notifications"
-          onPress={() => router.push(APP_ROUTES.notifications as Href)}
-          style={styles.bell}
-        >
-          <Ionicons name="notifications-outline" size={22} color={colors.text} />
-        </Pressable>
-      }
+      showNotificationBell
       scrollable
       refreshControl={
         <RefreshControl
@@ -293,16 +284,6 @@ function QuickTile({
 }
 
 const styles = StyleSheet.create({
-  bell: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   summaryRow: {
     flexDirection: 'row',
     gap: spacing.md,

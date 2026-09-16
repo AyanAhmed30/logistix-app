@@ -51,7 +51,7 @@ export default function ProfileScreen() {
   const email = user?.email ?? mockCustomer.email;
 
   return (
-    <ScreenContainer title="Profile" subtitle="Your Logistix account">
+    <ScreenContainer title="Profile" subtitle="Your Logistix account" showNotificationBell>
       <View style={styles.profileCard}>
         <Avatar initials={getInitials(user?.firstName, user?.lastName)} size="lg" />
         <View style={styles.profileInfo}>

@@ -15,7 +15,7 @@ import {
 
 import { ErrorBanner } from '@/components/auth';
 import { Button, FadeIn, ProgressBar, ScreenContainer, TextInput } from '@/components/ui';
-import { INQUIRY_WIZARD_STEPS, clampInquiryWizardStep } from '@/constants/inquiry-form';
+import { INQUIRY_WIZARD_STEPS } from '@/constants/inquiry-form';
 import { colors, radius, shadows, spacing, typography } from '@/constants/theme';
 import { queryClient } from '@/lib/query-client';
 import { APP_ROUTES, AUTH_ROUTES } from '@/navigation/routes';
@@ -51,6 +51,38 @@ const EMPTY: FormState = {
   cbm: '',
   notes: '',
 };
+
+const WHOLE_NUMBER = /^\d+$/;
+const DECIMAL_NUMBER = /^(?:\d+|\d+\.\d+|\d*\.\d+)$/;
+
+function sanitizeWholeNumber(value: string) {
+  return value.replace(/[^\d]/g, '');
+}
+
+function sanitizeDecimal(value: string) {
+  const cleaned = value.replace(/[^\d.]/g, '');
+  const firstDot = cleaned.indexOf('.');
+  if (firstDot < 0) return cleaned;
+  return cleaned.slice(0, firstDot + 1) + cleaned.slice(firstDot + 1).replace(/\./g, '');
+}
+
+function isProductComplete(form: FormState) {
+  return Boolean(form.productName.trim()) && WHOLE_NUMBER.test(form.quantity.trim());
+}
+
+function isCargoComplete(form: FormState) {
+  return (
+    DECIMAL_NUMBER.test(form.totalWeight.trim()) && DECIMAL_NUMBER.test(form.cbm.trim())
+  );
+}
+
+/** Progressive wizard index: Product → Cargo → Notes → Review based on completed fields. */
+function computeActiveStep(form: FormState): number {
+  if (!isProductComplete(form)) return 0;
+  if (!isCargoComplete(form)) return 1;
+  // Notes is optional — once cargo is done, Notes is complete and Review becomes active.
+  return 3;
+}
 
 function getSubmitErrorMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : '';
@@ -119,7 +151,6 @@ export default function NewRequestScreen() {
   const { data: portalData } = useCustomerPortal(sessionToken);
 
   const [draftId, setDraftId] = useState<string | null>(mode === 'edit_draft' ? selectedDraftId : null);
-  const [step, setStep] = useState(0);
   const [form, setForm] = useState<FormState>(EMPTY);
   const [attachments, setAttachments] = useState<LocalAttachment[]>([]);
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
@@ -138,6 +169,7 @@ export default function NewRequestScreen() {
 
   draftIdRef.current = draftId;
 
+  const step = useMemo(() => computeActiveStep(form), [form]);
   const progress = useMemo(() => ((step + 1) / STEPS.length) * 100, [step]);
   const remainingSlots = MAX_CUSTOMER_ATTACHMENTS - attachments.length;
   const busy = submitting || savingDraft;
@@ -146,7 +178,6 @@ export default function NewRequestScreen() {
     skipAutosaveRef.current = true;
     draftIdRef.current = null;
     setDraftId(null);
-    setStep(0);
     setForm(EMPTY);
     setAttachments([]);
     setErrors({});
@@ -190,7 +221,6 @@ export default function NewRequestScreen() {
         remoteUrl: item.url,
       })),
     );
-    setStep(clampInquiryWizardStep(draft.draftStep));
     setErrors({});
     setFormError(null);
     setSuccess(null);
@@ -350,42 +380,32 @@ export default function NewRequestScreen() {
           name,
           mimeType,
           size: asset.size ?? null,
-          kind: isImageAttachment({ kind: 'file', mimeType, name }) ? ('image' as const) : ('file' as const),
+          kind: isImageAttachment({ kind: 'file', mimeType, name })
+            ? ('image' as const)
+            : ('file' as const),
         };
       }),
     );
   };
 
-  const validateStep = (): boolean => {
+  const validateForm = (): boolean => {
     const next: Partial<Record<keyof FormState, string>> = {};
-    if (step === 0) {
-      if (!form.productName.trim()) next.productName = 'Product name is required';
-      if (!form.quantity.trim()) next.quantity = 'Quantity is required';
-      else if (!/^\d+$/.test(form.quantity.trim())) {
-        next.quantity = 'Quantity must be a whole number';
-      }
+    if (!form.productName.trim()) next.productName = 'Product name is required';
+    if (!form.quantity.trim()) next.quantity = 'Quantity is required';
+    else if (!WHOLE_NUMBER.test(form.quantity.trim())) {
+      next.quantity = 'Quantity must be a whole number';
     }
-    if (step === 1) {
-      if (!form.totalWeight.trim()) next.totalWeight = 'Weight is required';
-      else if (!/^(?:\d+|\d+\.\d+|\d*\.\d+)$/.test(form.totalWeight.trim())) {
-        next.totalWeight = 'Enter a valid number (e.g. 12.5)';
-      }
-      if (!form.cbm.trim()) next.cbm = 'CBM is required';
-      else if (!/^(?:\d+|\d+\.\d+|\d*\.\d+)$/.test(form.cbm.trim())) {
-        next.cbm = 'Enter a valid number (e.g. 12.5)';
-      }
+    if (!form.totalWeight.trim()) next.totalWeight = 'Weight is required';
+    else if (!DECIMAL_NUMBER.test(form.totalWeight.trim())) {
+      next.totalWeight = 'Enter a valid number (e.g. 12.5)';
     }
+    if (!form.cbm.trim()) next.cbm = 'CBM is required';
+    else if (!DECIMAL_NUMBER.test(form.cbm.trim())) {
+      next.cbm = 'Enter a valid number (e.g. 12.5)';
+    }
+    // Other details (notes) is intentionally optional — never required.
     setErrors(next);
     return Object.keys(next).length === 0;
-  };
-
-  const goNext = () => {
-    if (!validateStep()) return;
-    if (step < STEPS.length - 1) {
-      setStep((s) => s + 1);
-      return;
-    }
-    void submit();
   };
 
   const saveDraft = async () => {
@@ -409,6 +429,8 @@ export default function NewRequestScreen() {
   };
 
   const submit = async () => {
+    if (!validateForm()) return;
+
     if (!sessionToken) {
       setFormError('Your session expired. Please sign in again.');
       return;
@@ -531,10 +553,16 @@ export default function NewRequestScreen() {
     );
   }
 
+  const productDone = isProductComplete(form);
+  const cargoDone = isCargoComplete(form);
+  // Optional notes: treated as complete once cargo is filled so progress can reach Review.
+  const notesDone = cargoDone;
+  const reviewDone = productDone && cargoDone;
+
   return (
     <ScreenContainer
       title={mode === 'edit_draft' ? 'Continue draft' : 'New request'}
-      subtitle={`Step ${step + 1} of ${STEPS.length}: ${STEPS[step]}`}
+      subtitle={`${STEPS[step]} · ${step + 1} of ${STEPS.length}`}
       headerRight={
         <Pressable accessibilityRole="button" onPress={() => router.back()} hitSlop={12}>
           <Text style={styles.cancel}>Cancel</Text>
@@ -547,8 +575,13 @@ export default function NewRequestScreen() {
 
       <View style={styles.stepRow}>
         {STEPS.map((label, index) => {
+          const sectionDone =
+            (index === 0 && productDone) ||
+            (index === 1 && cargoDone) ||
+            (index === 2 && notesDone) ||
+            (index === 3 && reviewDone);
           const active = index === step;
-          const done = index < step;
+          const done = sectionDone && !active;
           return (
             <View key={label} style={styles.stepItem}>
               <View
@@ -564,7 +597,7 @@ export default function NewRequestScreen() {
                     (active || done) && styles.stepDotTextActive,
                   ]}
                 >
-                  {index + 1}
+                  {done ? '✓' : index + 1}
                 </Text>
               </View>
               <Text
@@ -578,168 +611,175 @@ export default function NewRequestScreen() {
         })}
       </View>
 
-      <FadeIn key={step}>
+      <FadeIn>
         <View style={styles.form}>
-          {step === 0 ? (
-            <>
-              <TextInput
-                label="Product name"
-                placeholder="e.g. Ceramic tiles"
-                value={form.productName}
-                onChangeText={(v) => update('productName', v)}
-                error={errors.productName}
-              />
-              <TextInput
-                label="Quantity"
-                placeholder="e.g. 120"
-                keyboardType="number-pad"
-                value={form.quantity}
-                onChangeText={(v) => update('quantity', v)}
-                error={errors.quantity}
-              />
-            </>
-          ) : null}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Product</Text>
+            <TextInput
+              label="Product name"
+              placeholder="e.g. Ceramic tiles"
+              value={form.productName}
+              onChangeText={(v) => update('productName', v)}
+              error={errors.productName}
+            />
+            <TextInput
+              label="Quantity"
+              placeholder="e.g. 120"
+              keyboardType="number-pad"
+              value={form.quantity}
+              onChangeText={(v) => update('quantity', sanitizeWholeNumber(v))}
+              error={errors.quantity}
+            />
+          </View>
 
-          {step === 1 ? (
-            <>
-              <TextInput
-                label="Total weight (kg)"
-                placeholder="e.g. 2400"
-                keyboardType="decimal-pad"
-                value={form.totalWeight}
-                onChangeText={(v) => update('totalWeight', v)}
-                error={errors.totalWeight}
-              />
-              <TextInput
-                label="Total CBM"
-                placeholder="e.g. 12.5"
-                keyboardType="decimal-pad"
-                value={form.cbm}
-                onChangeText={(v) => update('cbm', v)}
-                error={errors.cbm}
-              />
-            </>
-          ) : null}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Cargo</Text>
+            <TextInput
+              label="Total weight (kg)"
+              placeholder="e.g. 2400 or 12.5"
+              keyboardType="decimal-pad"
+              value={form.totalWeight}
+              onChangeText={(v) => update('totalWeight', sanitizeDecimal(v))}
+              error={errors.totalWeight}
+            />
+            <TextInput
+              label="Total CBM"
+              placeholder="e.g. 12.5"
+              keyboardType="decimal-pad"
+              value={form.cbm}
+              onChangeText={(v) => update('cbm', sanitizeDecimal(v))}
+              error={errors.cbm}
+            />
+          </View>
 
-          {step === 2 ? (
-            <>
-              <TextInput
-                label="Other details (optional)"
-                placeholder="Packaging notes, HS hints, special handling…"
-                value={form.notes}
-                onChangeText={(v) => update('notes', v)}
-                multiline
-              />
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Notes</Text>
+            <TextInput
+              label="Other details (optional)"
+              placeholder="Packaging notes, HS hints, special handling…"
+              value={form.notes}
+              onChangeText={(v) => update('notes', v)}
+              multiline
+              hint="You can leave this blank and still submit."
+            />
+          </View>
 
-              <View style={styles.attachCard}>
-                <Text style={styles.attachTitle}>Attachments (optional)</Text>
-                <Text style={styles.attachHint}>
-                  Add product photos or files (PDF). Up to {MAX_CUSTOMER_ATTACHMENTS} files, 10 MB
-                  each.
-                </Text>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Review</Text>
 
-                <View style={styles.attachActions}>
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={() => void pickImages()}
-                    disabled={remainingSlots <= 0 || busy}
-                    style={({ pressed }) => [
-                      styles.attachButton,
-                      pressed && styles.attachButtonPressed,
-                      remainingSlots <= 0 && styles.attachButtonDisabled,
-                    ]}
-                  >
-                    <Ionicons name="image-outline" size={18} color={colors.accent} />
-                    <Text style={styles.attachButtonText}>Add photos</Text>
-                  </Pressable>
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={() => void pickFiles()}
-                    disabled={remainingSlots <= 0 || busy}
-                    style={({ pressed }) => [
-                      styles.attachButton,
-                      pressed && styles.attachButtonPressed,
-                      remainingSlots <= 0 && styles.attachButtonDisabled,
-                    ]}
-                  >
-                    <Ionicons name="attach-outline" size={18} color={colors.accent} />
-                    <Text style={styles.attachButtonText}>Add files</Text>
-                  </Pressable>
+            <View style={styles.attachCard}>
+              <Text style={styles.attachTitle}>Attachments (optional)</Text>
+              <Text style={styles.attachHint}>
+                Add product photos or files (PDF). Up to {MAX_CUSTOMER_ATTACHMENTS} files, 10 MB
+                each.
+              </Text>
+
+              <View style={styles.attachActions}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => void pickImages()}
+                  disabled={remainingSlots <= 0 || busy}
+                  style={({ pressed }) => [
+                    styles.attachButton,
+                    pressed && styles.attachButtonPressed,
+                    remainingSlots <= 0 && styles.attachButtonDisabled,
+                  ]}
+                >
+                  <Ionicons name="image-outline" size={18} color={colors.accent} />
+                  <Text style={styles.attachButtonText}>Add photos</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => void pickFiles()}
+                  disabled={remainingSlots <= 0 || busy}
+                  style={({ pressed }) => [
+                    styles.attachButton,
+                    pressed && styles.attachButtonPressed,
+                    remainingSlots <= 0 && styles.attachButtonDisabled,
+                  ]}
+                >
+                  <Ionicons name="attach-outline" size={18} color={colors.accent} />
+                  <Text style={styles.attachButtonText}>Add files</Text>
+                </Pressable>
+              </View>
+
+              {attachments.length > 0 ? (
+                <View style={styles.attachList}>
+                  {attachments.map((item) => (
+                    <View key={item.id} style={styles.attachRow}>
+                      {item.kind === 'image' ? (
+                        <Image source={{ uri: item.uri }} style={styles.attachThumb} />
+                      ) : (
+                        <View style={styles.attachFileIcon}>
+                          <Ionicons name="document-outline" size={18} color={colors.textMuted} />
+                        </View>
+                      )}
+                      <Text style={styles.attachName} numberOfLines={1}>
+                        {item.name}
+                      </Text>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`Remove ${item.name}`}
+                        onPress={() => removeAttachment(item.id)}
+                        hitSlop={10}
+                      >
+                        <Ionicons name="close-circle" size={20} color={colors.textMuted} />
+                      </Pressable>
+                    </View>
+                  ))}
                 </View>
+              ) : null}
+            </View>
 
-                {attachments.length > 0 ? (
-                  <View style={styles.attachList}>
-                    {attachments.map((item) => (
-                      <View key={item.id} style={styles.attachRow}>
+            <View style={styles.reviewCard}>
+              <Text style={styles.reviewTitle}>Inquiry summary</Text>
+              <ReviewRow label="Product name" value={form.productName || '—'} />
+              <ReviewRow label="Quantity" value={form.quantity || '—'} />
+              <ReviewRow label="Total weight (kg)" value={form.totalWeight || '—'} />
+              <ReviewRow label="Total CBM" value={form.cbm || '—'} />
+              <ReviewRow label="Other details" value={form.notes.trim() || '—'} />
+
+              <View style={[styles.reviewRow, styles.reviewBorder]}>
+                <Text style={styles.reviewLabel}>Attachments</Text>
+                <View style={styles.reviewAttachValue}>
+                  {attachments.length === 0 ? (
+                    <Text style={styles.reviewValue}>None</Text>
+                  ) : (
+                    attachments.map((item) => (
+                      <View key={item.id} style={styles.reviewAttachItem}>
                         {item.kind === 'image' ? (
-                          <Image source={{ uri: item.uri }} style={styles.attachThumb} />
+                          <Image source={{ uri: item.uri }} style={styles.reviewAttachThumb} />
                         ) : (
-                          <View style={styles.attachFileIcon}>
-                            <Ionicons name="document-outline" size={18} color={colors.textMuted} />
+                          <View style={styles.reviewAttachFile}>
+                            <Ionicons name="document-outline" size={16} color={colors.textMuted} />
                           </View>
                         )}
-                        <Text style={styles.attachName} numberOfLines={1}>
+                        <Text style={styles.reviewAttachName} numberOfLines={2}>
                           {item.name}
                         </Text>
-                        <Pressable
-                          accessibilityRole="button"
-                          accessibilityLabel={`Remove ${item.name}`}
-                          onPress={() => removeAttachment(item.id)}
-                          hitSlop={10}
-                        >
-                          <Ionicons name="close-circle" size={20} color={colors.textMuted} />
-                        </Pressable>
                       </View>
-                    ))}
-                  </View>
-                ) : null}
+                    ))
+                  )}
+                </View>
               </View>
-            </>
-          ) : null}
 
-          {step === 3 ? (
-            <View style={styles.reviewCard}>
-              <Text style={styles.reviewTitle}>Review before submit</Text>
-              <ReviewRow label="Product name" value={form.productName} />
-              <ReviewRow label="Quantity" value={form.quantity} />
-              <ReviewRow label="Total weight (kg)" value={form.totalWeight} />
-              <ReviewRow label="Total CBM" value={form.cbm} />
-              <ReviewRow label="Other details" value={form.notes.trim() || '—'} />
-              <ReviewRow
-                label="Attachments"
-                value={
-                  attachments.length === 0
-                    ? 'None'
-                    : attachments.map((item) => item.name).join(', ')
-                }
-                last
-              />
               <Text style={styles.reviewHint}>
                 This uses the same cargo fields as CRM Sales inquiries. Your sales agent will
                 review and forward to Operations.
               </Text>
             </View>
-          ) : null}
+          </View>
         </View>
       </FadeIn>
 
       <View style={styles.actions}>
-        {step > 0 ? (
-          <Button
-            label="Back"
-            variant="outline"
-            fullWidth
-            onPress={() => setStep((s) => s - 1)}
-            disabled={busy}
-          />
-        ) : null}
         <Button
-          label={step === STEPS.length - 1 ? 'Submit request' : 'Continue'}
+          label="Submit request"
           fullWidth
           size="lg"
           loading={submitting}
           disabled={busy && !submitting}
-          onPress={goNext}
+          onPress={() => void submit()}
         />
         <Button
           label="Save as Draft"
@@ -821,7 +861,15 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   form: {
-    gap: spacing.lg,
+    gap: spacing.xl,
+  },
+  section: {
+    gap: spacing.md,
+  },
+  sectionTitle: {
+    ...typography.h3,
+    color: colors.text,
+    fontSize: 17,
   },
   attachCard: {
     backgroundColor: colors.surface,
@@ -930,6 +978,36 @@ const styles = StyleSheet.create({
   },
   reviewValue: {
     ...typography.body,
+    color: colors.text,
+    flex: 1,
+    minWidth: 0,
+  },
+  reviewAttachValue: {
+    flex: 1,
+    minWidth: 0,
+    gap: spacing.sm,
+  },
+  reviewAttachItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  reviewAttachThumb: {
+    width: 56,
+    height: 56,
+    borderRadius: radius.sm,
+    backgroundColor: colors.surfaceMuted,
+  },
+  reviewAttachFile: {
+    width: 56,
+    height: 56,
+    borderRadius: radius.sm,
+    backgroundColor: colors.surfaceMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reviewAttachName: {
+    ...typography.bodySmall,
     color: colors.text,
     flex: 1,
     minWidth: 0,

@@ -25,14 +25,14 @@ export default function TrackingScreen() {
 
   if (!shipment) {
     return (
-      <ScreenContainer title="Tracking" subtitle="No active shipments">
+      <ScreenContainer title="Tracking" subtitle="No active shipments" showNotificationBell>
         <Text style={styles.empty}>When cargo moves through the warehouse, milestones will appear here.</Text>
       </ScreenContainer>
     );
   }
 
   return (
-    <ScreenContainer title="Tracking" subtitle="Warehouse milestones & transit">
+    <ScreenContainer title="Tracking" subtitle="Warehouse milestones & transit" showNotificationBell>
       <View style={styles.shipmentTabs}>
         {mockShipments.map((item) => {
           const isSelected = item.id === selectedId;

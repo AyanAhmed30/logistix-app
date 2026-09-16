@@ -40,6 +40,18 @@ type ListItem = {
   source: 'live' | 'demo';
 };
 
+function formatRequestCargoMeta(input: {
+  quantity?: string | null;
+  totalWeight?: string | null;
+  cbm?: string | null;
+}): string {
+  const parts: string[] = [];
+  if (input.quantity?.trim()) parts.push(`Qty: ${input.quantity.trim()}`);
+  if (input.totalWeight?.trim()) parts.push(`Weight: ${input.totalWeight.trim()} kg`);
+  if (input.cbm?.trim()) parts.push(`CBM: ${input.cbm.trim()}`);
+  return parts.join(' · ') || 'Details pending';
+}
+
 function liveToListItem(inquiry: CustomerInquiry): ListItem {
   const status = mapInternalToCustomerStatus({
     status: inquiry.status,
@@ -52,7 +64,11 @@ function liveToListItem(inquiry: CustomerInquiry): ListItem {
     id: inquiry.id,
     title: inquiry.productName?.trim() || 'Freight request',
     subtitle: inquiry.inquiryNumber,
-    meta: [inquiry.quantity, inquiry.totalWeight].filter(Boolean).join(' · ') || 'Details pending',
+    meta: formatRequestCargoMeta({
+      quantity: inquiry.quantity,
+      totalWeight: inquiry.totalWeight,
+      cbm: inquiry.cbm,
+    }),
     nextStep: getCustomerStatusVisual(status).nextStep,
     status,
     source: 'live',
@@ -64,7 +80,11 @@ function mockToListItem(request: MockRequest): ListItem {
     id: request.id,
     title: request.productName,
     subtitle: request.requestNumber,
-    meta: [request.quantity, request.totalWeight].filter(Boolean).join(' · '),
+    meta: formatRequestCargoMeta({
+      quantity: request.quantity,
+      totalWeight: request.totalWeight,
+      cbm: request.cbm,
+    }),
     nextStep: request.nextStep,
     status: request.status,
     source: 'demo',
@@ -115,6 +135,7 @@ export default function InquiriesScreen() {
             ? 'Demo requests for exploration'
             : 'Freight requests linked to your phone'
       }
+      showNotificationBell
       headerRight={
         <Pressable
           accessibilityRole="button"
@@ -418,8 +439,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   cardMeta: {
-    ...typography.caption,
+    ...typography.bodySmall,
     color: colors.textSecondary,
+    lineHeight: 20,
   },
   cardNext: {
     ...typography.bodySmall,

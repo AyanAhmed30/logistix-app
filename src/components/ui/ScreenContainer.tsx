@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { NotificationBellButton } from '@/components/ui/NotificationBellButton';
 import { colors, spacing, typography } from '@/constants/theme';
 
 type ScreenContainerProps = {
@@ -18,6 +19,8 @@ type ScreenContainerProps = {
   style?: ViewStyle;
   scrollable?: boolean;
   headerRight?: ReactNode;
+  /** Shows the shared notification bell (unread badge) in the header. */
+  showNotificationBell?: boolean;
   edges?: ('top' | 'bottom' | 'left' | 'right')[];
   refreshControl?: React.ReactElement<RefreshControlProps>;
 };
@@ -29,10 +32,11 @@ export function ScreenContainer({
   style,
   scrollable = true,
   headerRight,
+  showNotificationBell = false,
   edges = ['top'],
   refreshControl,
 }: ScreenContainerProps) {
-  const hasHeader = Boolean(title || subtitle || headerRight);
+  const hasHeader = Boolean(title || subtitle || headerRight || showNotificationBell);
 
   const content = scrollable ? (
     <ScrollView
@@ -56,7 +60,12 @@ export function ScreenContainer({
             {title ? <Text style={styles.title}>{title}</Text> : null}
             {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
           </View>
-          {headerRight}
+          {showNotificationBell || headerRight ? (
+            <View style={styles.headerActions}>
+              {showNotificationBell ? <NotificationBellButton size="compact" /> : null}
+              {headerRight}
+            </View>
+          ) : null}
         </View>
       ) : null}
       {content}
@@ -80,6 +89,11 @@ const styles = StyleSheet.create({
   headerText: {
     flex: 1,
     paddingRight: spacing.md,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
   title: {
     ...typography.h1,
