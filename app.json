@@ -37,7 +37,7 @@
       ]
     },
     "web": {
-      "favicon": "./assets/favicon.png",
+      "favicon": "./assets/logo.png",
       "bundler": "metro",
       "output": "single",
       "name": "Logistix",
