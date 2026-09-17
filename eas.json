@@ -10,8 +10,23 @@
     },
     "preview": {
       "distribution": "internal",
+      "credentialsSource": "remote",
       "android": {
         "buildType": "apk"
+      },
+      "ios": {
+        "simulator": false,
+        "buildConfiguration": "Release"
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://uoavdzggnqhypdyenigd.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_wJxSv-WLw_Kh0GpeP3w8FA_Y-Y5ylQ5"
+      }
+    },
+    "preview-simulator": {
+      "distribution": "internal",
+      "ios": {
+        "simulator": true
       },
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://uoavdzggnqhypdyenigd.supabase.co",
@@ -19,8 +34,18 @@
       }
     },
     "production": {
+      "distribution": "store",
+      "credentialsSource": "remote",
       "android": {
         "buildType": "apk"
+      },
+      "ios": {
+        "simulator": false,
+        "buildConfiguration": "Release"
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://uoavdzggnqhypdyenigd.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_wJxSv-WLw_Kh0GpeP3w8FA_Y-Y5ylQ5"
       }
     }
   },

@@ -14,7 +14,13 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.logistix.customer"
+      "bundleIdentifier": "com.logistix.customer",
+      "buildNumber": "1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSPhotoLibraryUsageDescription": "Allow Logistix to attach product photos to your freight request.",
+        "NSCameraUsageDescription": "Allow Logistix to photograph cargo for your freight request."
+      }
     },
     "android": {
       "package": "com.logistix.customer",
@@ -31,7 +37,17 @@
       ]
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "output": "single",
+      "name": "Logistix",
+      "shortName": "Logistix",
+      "description": "Logistix — freight requests, quotes, and shipment tracking.",
+      "themeColor": "#0B1F3A",
+      "backgroundColor": "#ffffff",
+      "display": "standalone",
+      "lang": "en",
+      "startUrl": "."
     },
     "plugins": [
       "expo-router",

@@ -37,6 +37,7 @@
     "@react-native-community/cli": "^20.2.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/react": "~19.1.10",
+    "eas-cli": "^24.6.0",
     "eslint": "^9.0.0",
     "eslint-config-expo": "~10.0.0",
     "eslint-config-prettier": "^10.1.8",
@@ -49,12 +50,15 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
+    "export:web": "expo export --platform web",
+    "serve:web": "npx --yes serve dist -s",
     "lint": "expo lint",
     "lint:fix": "expo lint --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
-    "build:android:apk": "npx eas-cli@latest build --platform android --profile preview"
+    "build:android:apk": "eas build --platform android --profile preview",
+    "build:ios:ipa": "eas build --platform ios --profile preview"
   },
   "private": true
 }
