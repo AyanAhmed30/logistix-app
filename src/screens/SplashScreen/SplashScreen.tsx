@@ -1,3 +1,4 @@
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, type Href } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
@@ -55,10 +56,15 @@ export function SplashScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.accentBar} />
+      <LinearGradient
+        colors={[colors.primaryDark, colors.primary, colors.accentDark]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
       <View style={styles.glow} />
       <Animated.View style={{ opacity: logoOpacity, transform: [{ scale: logoScale }] }}>
-        <AppLogo size="lg" />
+        <AppLogo size="lg" linkToHome={false} />
       </Animated.View>
       <Animated.Text style={[styles.tagline, { opacity: taglineOpacity }]}>
         Freight clarity for your business
@@ -70,31 +76,23 @@ export function SplashScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.xxl,
     paddingHorizontal: spacing.xl,
-  },
-  accentBar: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 6,
-    backgroundColor: colors.brandNavy,
+    backgroundColor: colors.primaryDark,
   },
   glow: {
     position: 'absolute',
-    width: 260,
-    height: 260,
-    borderRadius: 130,
-    backgroundColor: colors.accentLight,
-    opacity: 0.85,
+    width: 280,
+    height: 280,
+    borderRadius: 140,
+    backgroundColor: colors.accentGlow,
   },
   tagline: {
     ...typography.body,
-    color: colors.brandNavy,
+    color: colors.white,
     textAlign: 'center',
+    fontWeight: '600',
   },
 });

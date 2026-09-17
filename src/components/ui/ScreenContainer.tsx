@@ -54,6 +54,7 @@ export function ScreenContainer({
 
   return (
     <SafeAreaView style={styles.container} edges={edges}>
+      <View style={styles.ambient} pointerEvents="none" />
       {hasHeader ? (
         <View style={styles.header}>
           <View style={styles.headerText}>
@@ -77,6 +78,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  ambient: {
+    position: 'absolute',
+    top: -80,
+    right: -60,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: colors.accentGlow,
   },
   header: {
     flexDirection: 'row',

@@ -1,10 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Redirect, Tabs, useRouter } from 'expo-router';
 import { useEffect } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, Platform, View } from 'react-native';
 
 import { AssignedSalesAgentWhatsAppFab } from '@/components/support/AssignedSalesAgentWhatsAppFab';
-import { colors } from '@/constants/theme';
+import { colors, shadows } from '@/constants/theme';
 import { AUTH_ROUTES } from '@/navigation/routes';
 import { useAuth } from '@/providers';
 
@@ -20,7 +20,14 @@ export default function TabLayout() {
 
   if (isLoading) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background }}>
+      <View
+        style={{
+          flex: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: colors.background,
+        }}
+      >
         <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
@@ -31,7 +38,7 @@ export default function TabLayout() {
   }
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       <Tabs
         screenOptions={{
           headerShown: false,
@@ -39,13 +46,16 @@ export default function TabLayout() {
           tabBarInactiveTintColor: colors.textMuted,
           tabBarStyle: {
             backgroundColor: colors.surface,
-            borderTopColor: colors.border,
-            paddingTop: 4,
-            height: 60,
+            borderTopColor: colors.borderLight,
+            borderTopWidth: 1,
+            paddingTop: 6,
+            height: Platform.OS === 'ios' ? 84 : 64,
+            paddingBottom: Platform.OS === 'ios' ? 24 : 8,
+            ...shadows.md,
           },
           tabBarLabelStyle: {
             fontSize: 11,
-            fontWeight: '600',
+            fontWeight: '700',
           },
         }}
       >
@@ -53,8 +63,8 @@ export default function TabLayout() {
           name="index"
           options={{
             title: 'Home',
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="home-outline" size={size} color={color} />
+            tabBarIcon: ({ color, size, focused }) => (
+              <Ionicons name={focused ? 'home' : 'home-outline'} size={size} color={color} />
             ),
           }}
         />
@@ -62,8 +72,12 @@ export default function TabLayout() {
           name="inquiries"
           options={{
             title: 'Requests',
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="document-text-outline" size={size} color={color} />
+            tabBarIcon: ({ color, size, focused }) => (
+              <Ionicons
+                name={focused ? 'document-text' : 'document-text-outline'}
+                size={size}
+                color={color}
+              />
             ),
           }}
         />
@@ -71,8 +85,8 @@ export default function TabLayout() {
           name="orders"
           options={{
             title: 'Orders',
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="cube-outline" size={size} color={color} />
+            tabBarIcon: ({ color, size, focused }) => (
+              <Ionicons name={focused ? 'cube' : 'cube-outline'} size={size} color={color} />
             ),
           }}
         />
@@ -80,8 +94,12 @@ export default function TabLayout() {
           name="tracking"
           options={{
             title: 'Tracking',
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="navigate-outline" size={size} color={color} />
+            tabBarIcon: ({ color, size, focused }) => (
+              <Ionicons
+                name={focused ? 'navigate' : 'navigate-outline'}
+                size={size}
+                color={color}
+              />
             ),
           }}
         />
@@ -89,8 +107,8 @@ export default function TabLayout() {
           name="profile"
           options={{
             title: 'Profile',
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="person-outline" size={size} color={color} />
+            tabBarIcon: ({ color, size, focused }) => (
+              <Ionicons name={focused ? 'person' : 'person-outline'} size={size} color={color} />
             ),
           }}
         />

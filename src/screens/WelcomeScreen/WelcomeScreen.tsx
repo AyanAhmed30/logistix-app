@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, type Href } from 'expo-router';
 import { useEffect } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
@@ -55,50 +56,60 @@ export function WelcomeScreen() {
   const firstName = user.firstName?.trim() || 'there';
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
-        <FadeIn>
-          <AppLogo size="md" />
-          <Text style={styles.eyebrow}>Welcome to Logistix</Text>
-          <Text style={styles.title}>Good to see you, {firstName}</Text>
-          <Text style={styles.subtitle}>
-            Your account is ready. Here’s what you can do in the customer app.
-          </Text>
-        </FadeIn>
+    <View style={styles.root}>
+      <LinearGradient
+        colors={[colors.primaryDark, colors.primary, colors.background]}
+        locations={[0, 0.4, 0.75]}
+        style={StyleSheet.absoluteFill}
+      />
+      <SafeAreaView style={styles.container}>
+        <View style={styles.content}>
+          <FadeIn>
+            <AppLogo size="md" />
+            <Text style={styles.eyebrow}>Welcome to Logistix</Text>
+            <Text style={styles.title}>Good to see you, {firstName}</Text>
+            <Text style={styles.subtitle}>
+              Your account is ready. Here’s what you can do in the customer app.
+            </Text>
+          </FadeIn>
 
-        <FadeIn delay={100}>
-          <View style={styles.cards}>
-            {CAPABILITIES.map((item) => (
-              <View key={item.title} style={styles.card}>
-                <View style={styles.iconWrap}>
-                  <Ionicons name={item.icon} size={22} color={colors.accent} />
+          <FadeIn delay={100}>
+            <View style={styles.cards}>
+              {CAPABILITIES.map((item) => (
+                <View key={item.title} style={styles.card}>
+                  <View style={styles.iconWrap}>
+                    <Ionicons name={item.icon} size={22} color={colors.accent} />
+                  </View>
+                  <View style={styles.cardText}>
+                    <Text style={styles.cardTitle}>{item.title}</Text>
+                    <Text style={styles.cardBody}>{item.body}</Text>
+                  </View>
                 </View>
-                <View style={styles.cardText}>
-                  <Text style={styles.cardTitle}>{item.title}</Text>
-                  <Text style={styles.cardBody}>{item.body}</Text>
-                </View>
-              </View>
-            ))}
-          </View>
-        </FadeIn>
+              ))}
+            </View>
+          </FadeIn>
 
-        <FadeIn delay={180}>
-          <Button
-            label="Go to Home"
-            fullWidth
-            size="lg"
-            onPress={() => router.replace(APP_ROUTES.home as Href)}
-          />
-        </FadeIn>
-      </View>
-    </SafeAreaView>
+          <FadeIn delay={180}>
+            <Button
+              label="Go to Home"
+              fullWidth
+              size="lg"
+              onPress={() => router.replace(APP_ROUTES.home as Href)}
+            />
+          </FadeIn>
+        </View>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: colors.primaryDark,
+  },
   container: {
     flex: 1,
-    backgroundColor: colors.background,
   },
   centered: {
     flex: 1,
@@ -124,13 +135,13 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.h1,
-    color: colors.text,
+    color: colors.white,
     textAlign: 'center',
     marginTop: spacing.sm,
   },
   subtitle: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: 'rgba(255,255,255,0.8)',
     textAlign: 'center',
     marginTop: spacing.sm,
   },
@@ -141,11 +152,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.md,
     backgroundColor: colors.surface,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     padding: spacing.lg,
     borderWidth: 1,
     borderColor: colors.borderLight,
-    ...shadows.sm,
+    ...shadows.md,
   },
   iconWrap: {
     width: 44,

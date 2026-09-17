@@ -5,6 +5,28 @@ export function normalizePhoneNumber(phone: string): string {
   return cleaned.startsWith('+') ? cleaned : `+${cleaned}`;
 }
 
+/** Strip to Pakistan local mobile digits (3XXXXXXXXX). */
+export function extractPakistanLocalDigits(input: string): string {
+  let digits = input.replace(/\D/g, '');
+  if (digits.startsWith('92')) digits = digits.slice(2);
+  if (digits.startsWith('0')) digits = digits.slice(1);
+  return digits.slice(0, 10);
+}
+
+/** Build E.164 Pakistan number from local mobile digits. */
+export function normalizePakistanPhone(localInput: string): string {
+  const local = extractPakistanLocalDigits(localInput);
+  return `+92${local}`;
+}
+
+/** Local PK mobile only — UI shows fixed +92 with flag. */
+export const pakistanLocalPhoneSchema = z
+  .string()
+  .min(1, 'Phone number is required')
+  .refine((value) => /^3\d{9}$/.test(extractPakistanLocalDigits(value)), {
+    message: 'Enter a valid 10-digit mobile number starting with 3',
+  });
+
 export const phoneFieldSchema = z
   .string()
   .min(1, 'Phone number is required')
@@ -55,8 +77,12 @@ export const signupWizardSchema = z
   });
 
 export const loginSchema = z.object({
-  phone: phoneFieldSchema,
+  phone: pakistanLocalPhoneSchema,
   password: z.string().min(1, 'Password is required'),
+});
+
+export const signupPhoneSchema = z.object({
+  phone: pakistanLocalPhoneSchema,
 });
 
 export type SignupWizardFormValues = z.infer<typeof signupWizardSchema>;

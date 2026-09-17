@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 
 import { colors, radius, spacing, typography } from '@/constants/theme';
+import { webNoFocusRing } from '@/utils/web-focus';
 
 type InputProps = TextInputProps & {
   label?: string;
@@ -31,7 +32,6 @@ export function TextInput({
   style,
   ...props
 }: InputProps) {
-  const [isFocused, setIsFocused] = useState(false);
   const [isSecure, setIsSecure] = useState(secureTextEntry);
 
   const showPasswordToggle = secureTextEntry && !rightIcon;
@@ -39,28 +39,15 @@ export function TextInput({
   return (
     <View style={styles.wrapper}>
       {label ? <Text style={styles.label}>{label}</Text> : null}
-      <View
-        style={[
-          styles.inputContainer,
-          isFocused && styles.inputFocused,
-          error ? styles.inputError : null,
-        ]}
-      >
+      <View style={[styles.inputContainer, error ? styles.inputError : null]}>
         {leftIcon ? (
           <Ionicons name={leftIcon} size={20} color={colors.textMuted} style={styles.leftIcon} />
         ) : null}
         <RNTextInput
           placeholderTextColor={colors.textMuted}
           secureTextEntry={isSecure}
-          style={[styles.input, style]}
-          onFocus={(e) => {
-            setIsFocused(true);
-            props.onFocus?.(e);
-          }}
-          onBlur={(e) => {
-            setIsFocused(false);
-            props.onBlur?.(e);
-          }}
+          style={[styles.input, webNoFocusRing, style]}
+          underlineColorAndroid="transparent"
           {...props}
         />
         {showPasswordToggle ? (
@@ -104,16 +91,13 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceMuted,
     borderWidth: 1.5,
     borderColor: colors.border,
     borderRadius: radius.md,
     paddingHorizontal: spacing.lg,
     minHeight: 52,
-  },
-  inputFocused: {
-    borderColor: colors.primary,
-    backgroundColor: colors.surface,
+    width: '100%',
   },
   inputError: {
     borderColor: colors.error,

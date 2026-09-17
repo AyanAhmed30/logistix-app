@@ -1,42 +1,92 @@
-import { Image, StyleSheet, View } from 'react-native';
+import { useRouter, type Href } from 'expo-router';
+import { Image, Pressable, StyleSheet, View } from 'react-native';
 
 import { APP_NAME } from '@/constants';
-import { spacing } from '@/constants/theme';
+import { colors, radius, shadows } from '@/constants/theme';
+import { APP_ROUTES, AUTH_ROUTES } from '@/navigation/routes';
+import { useAuth } from '@/providers';
 
 const logoSource = require('../../../assets/logo.png');
 
-/** Horizontal wordmark aspect ratio (width / height). */
-const LOGO_ASPECT_RATIO = 3.6;
-
 type AppLogoProps = {
   size?: 'sm' | 'md' | 'lg';
+  /** Soft light backing for dark backgrounds (tight to the mark, not a big white box). */
+  onDark?: boolean;
+  /** When true (default), tap navigates to the home screen. */
+  linkToHome?: boolean;
 };
 
-const widthMap = {
-  sm: 168,
-  md: 220,
-  lg: 280,
+/**
+ * logo.png is 256×256 with the wordmark centered and empty padding.
+ * Clip a wide frame and scale up so only the mark shows.
+ */
+const sizeMap = {
+  sm: { frameW: 96, frameH: 28, img: 112, padH: 8, padV: 5 },
+  md: { frameW: 120, frameH: 34, img: 140, padH: 10, padV: 6 },
+  lg: { frameW: 148, frameH: 42, img: 172, padH: 12, padV: 8 },
 };
 
-export function AppLogo({ size = 'md' }: AppLogoProps) {
-  const width = widthMap[size];
-  const height = width / LOGO_ASPECT_RATIO;
+export function AppLogo({ size = 'md', onDark = true, linkToHome = true }: AppLogoProps) {
+  const router = useRouter();
+  const { user } = useAuth();
+  const s = sizeMap[size];
+
+  const mark = (
+    <View
+      style={[
+        styles.shell,
+        onDark && styles.shellOnDark,
+        {
+          paddingHorizontal: s.padH,
+          paddingVertical: s.padV,
+        },
+      ]}
+    >
+      <View style={[styles.frame, { width: s.frameW, height: s.frameH }]}>
+        <Image
+          source={logoSource}
+          style={{ width: s.img, height: s.img }}
+          resizeMode="contain"
+        />
+      </View>
+    </View>
+  );
+
+  if (!linkToHome) {
+    return mark;
+  }
 
   return (
-    <View style={styles.container}>
-      <Image
-        source={logoSource}
-        style={{ width, height }}
-        resizeMode="contain"
-        accessibilityLabel={`${APP_NAME} logo`}
-      />
-    </View>
+    <Pressable
+      accessibilityRole="link"
+      accessibilityLabel={`${APP_NAME} home`}
+      hitSlop={8}
+      onPress={() => {
+        const href = (user ? APP_ROUTES.home : AUTH_ROUTES.home) as Href;
+        router.replace(href);
+      }}
+      style={({ pressed }) => [pressed && styles.pressed]}
+    >
+      {mark}
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  shell: {
+    alignSelf: 'center',
+    borderRadius: radius.md,
+  },
+  shellOnDark: {
+    backgroundColor: colors.white,
+    ...shadows.sm,
+  },
+  frame: {
     alignItems: 'center',
-    paddingVertical: spacing.xs,
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  pressed: {
+    opacity: 0.85,
   },
 });

@@ -13,7 +13,7 @@ export function BenefitItem({ icon, title, description }: BenefitItemProps) {
   return (
     <View style={styles.container}>
       <View style={styles.iconWrap}>
-        <Ionicons name={icon} size={22} color={colors.primary} />
+        <Ionicons name={icon} size={22} color={colors.accentDark} />
       </View>
       <View style={styles.content}>
         <Text style={styles.title}>{title}</Text>
@@ -33,7 +33,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: radius.md,
-    backgroundColor: colors.primaryLight,
+    backgroundColor: colors.accentLight,
     alignItems: 'center',
     justifyContent: 'center',
   },

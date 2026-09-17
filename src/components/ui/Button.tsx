@@ -8,7 +8,7 @@ import {
   ViewStyle,
 } from 'react-native';
 
-import { colors, radius, spacing, typography } from '@/constants/theme';
+import { colors, radius, shadows, spacing, typography } from '@/constants/theme';
 
 type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
 type ButtonSize = 'sm' | 'md' | 'lg';
@@ -103,8 +103,8 @@ const sizeLabelStyles = StyleSheet.create({
 });
 
 const variantStyles = StyleSheet.create({
-  primary: { backgroundColor: colors.primary },
-  secondary: { backgroundColor: colors.primaryLight },
+  primary: { backgroundColor: colors.primary, ...shadows.sm },
+  secondary: { backgroundColor: colors.accentLight },
   outline: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: colors.border },
   ghost: { backgroundColor: 'transparent' },
   danger: { backgroundColor: colors.error },
@@ -114,6 +114,6 @@ const labelVariantStyles = StyleSheet.create({
   primary: { color: colors.surface },
   secondary: { color: colors.primary },
   outline: { color: colors.text },
-  ghost: { color: colors.primary },
+  ghost: { color: colors.accentDark },
   danger: { color: colors.surface },
 });

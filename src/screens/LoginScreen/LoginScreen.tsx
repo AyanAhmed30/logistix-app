@@ -4,13 +4,13 @@ import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { AuthFooterLink, AuthScreenLayout, ErrorBanner } from '@/components/auth';
-import { Button, TextInput } from '@/components/ui';
+import { AuthFooterLink, AuthScreenLayout, ErrorBanner, PakistanPhoneField } from '@/components/auth';
+import { Button, FadeIn, TextInput } from '@/components/ui';
 import { AUTH_ROUTES, APP_ROUTES } from '@/navigation/routes';
 import { useAuth } from '@/providers';
 import { loginUser } from '@/services/auth';
 import { getAuthErrorMessage } from '@/utils/auth-errors';
-import { LoginFormValues, loginSchema, normalizePhoneNumber } from '@/utils/validation';
+import { LoginFormValues, loginSchema, normalizePakistanPhone } from '@/utils/validation';
 import { colors, spacing, typography } from '@/constants/theme';
 
 export function LoginScreen() {
@@ -29,7 +29,7 @@ export function LoginScreen() {
 
   const onSubmit = async (values: LoginFormValues) => {
     setFormError(null);
-    const normalizedPhone = normalizePhoneNumber(values.phone);
+    const normalizedPhone = normalizePakistanPhone(values.phone);
 
     const result = await loginUser(normalizedPhone, values.password);
 
@@ -45,7 +45,7 @@ export function LoginScreen() {
   return (
     <AuthScreenLayout
       title="Welcome back"
-      subtitle="Sign in with the phone number linked to your Logistix Customer ID."
+      subtitle="Sign in with your Phone number."
       footer={
         <AuthFooterLink
           prompt="Don't have an account?"
@@ -54,60 +54,57 @@ export function LoginScreen() {
         />
       }
     >
-      {formError ? <ErrorBanner message={formError} /> : null}
+      <FadeIn>
+        {formError ? <ErrorBanner message={formError} /> : null}
 
-      <View style={styles.form}>
-        <Controller
-          control={control}
-          name="phone"
-          render={({ field: { onChange, onBlur, value } }) => (
-            <TextInput
-              label="Phone Number"
-              placeholder="+92 300 1234567"
-              keyboardType="phone-pad"
-              autoComplete="tel"
-              leftIcon="call-outline"
-              value={value}
-              onChangeText={onChange}
-              onBlur={onBlur}
-              error={errors.phone?.message}
-            />
-          )}
-        />
+        <View style={styles.form}>
+          <Controller
+            control={control}
+            name="phone"
+            render={({ field: { onChange, onBlur, value } }) => (
+              <PakistanPhoneField
+                value={value}
+                onChangeText={onChange}
+                onBlur={onBlur}
+                error={errors.phone?.message}
+              />
+            )}
+          />
 
-        <Controller
-          control={control}
-          name="password"
-          render={({ field: { onChange, onBlur, value } }) => (
-            <TextInput
-              label="Password"
-              placeholder="Enter your password"
-              secureTextEntry
-              leftIcon="lock-closed-outline"
-              value={value}
-              onChangeText={onChange}
-              onBlur={onBlur}
-              error={errors.password?.message}
-            />
-          )}
-        />
+          <Controller
+            control={control}
+            name="password"
+            render={({ field: { onChange, onBlur, value } }) => (
+              <TextInput
+                label="Password"
+                placeholder="Enter your password"
+                secureTextEntry
+                leftIcon="lock-closed-outline"
+                value={value}
+                onChangeText={onChange}
+                onBlur={onBlur}
+                error={errors.password?.message}
+              />
+            )}
+          />
 
-        <Pressable
-          accessibilityRole="link"
-          onPress={() => router.push(AUTH_ROUTES.forgotPassword)}
-          style={styles.forgotWrap}
-        >
-          <Text style={styles.forgot}>Forgot password?</Text>
-        </Pressable>
+          <Pressable
+            accessibilityRole="link"
+            onPress={() => router.push(AUTH_ROUTES.forgotPassword)}
+            style={styles.forgotWrap}
+          >
+            <Text style={styles.forgot}>Forgot password?</Text>
+          </Pressable>
 
-        <Button
-          label="Sign In"
-          fullWidth
-          size="lg"
-          loading={isSubmitting}
-          onPress={handleSubmit(onSubmit)}
-        />
-      </View>
+          <Button
+            label="Sign In"
+            fullWidth
+            size="lg"
+            loading={isSubmitting}
+            onPress={handleSubmit(onSubmit)}
+          />
+        </View>
+      </FadeIn>
     </AuthScreenLayout>
   );
 }

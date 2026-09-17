@@ -7,10 +7,12 @@ import {
   Text,
   View,
   ViewStyle,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppLogo } from '@/components/auth/AppLogo';
+import { AuthLogisticsBackground } from '@/components/auth/AuthLogisticsBackground';
 import { colors, radius, shadows, spacing, typography } from '@/constants/theme';
 
 type AuthScreenLayoutProps = {
@@ -30,33 +32,40 @@ export function AuthScreenLayout({
   style,
   showLogo = true,
 }: AuthScreenLayoutProps) {
+  const { width: windowWidth } = useWindowDimensions();
+  const contentWidth = Math.min(windowWidth, 440);
+
   return (
     <SafeAreaView style={styles.safeArea}>
+      <AuthLogisticsBackground />
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
-          contentContainerStyle={[styles.content, style]}
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {showLogo ? (
-            <View style={styles.logoWrap}>
-              <AppLogo size="md" />
-            </View>
-          ) : null}
+          <View style={[styles.content, { width: contentWidth }, style]}>
+            {showLogo ? (
+              <View style={styles.logoWrap}>
+                <AppLogo size="md" />
+              </View>
+            ) : null}
 
-          {(title || subtitle) && (
-            <View style={styles.header}>
-              {title ? <Text style={styles.title}>{title}</Text> : null}
-              {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
-            </View>
-          )}
+            {(title || subtitle) && (
+              <View style={styles.header}>
+                {title ? <Text style={styles.title}>{title}</Text> : null}
+                {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+              </View>
+            )}
 
-          <View style={styles.formCard}>{children}</View>
+            <View style={styles.formCard}>{children}</View>
 
-          {footer ? <View style={styles.footer}>{footer}</View> : null}
+            {footer ? <View style={styles.footer}>{footer}</View> : null}
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -66,20 +75,25 @@ export function AuthScreenLayout({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#1B4F72',
   },
   flex: {
     flex: 1,
   },
-  content: {
-    flexGrow: 1,
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.xxxl,
-    gap: spacing.lg,
-    maxWidth: 480,
+  scroll: {
+    flex: 1,
     width: '100%',
-    alignSelf: 'center',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.xxl,
+    paddingHorizontal: spacing.lg,
+  },
+  content: {
+    gap: spacing.lg,
+    paddingHorizontal: spacing.md,
   },
   logoWrap: {
     alignItems: 'center',
@@ -91,25 +105,33 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.h1,
-    color: colors.text,
+    color: colors.white,
     textAlign: 'center',
+    textShadowColor: 'rgba(0,0,0,0.45)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 8,
   },
   subtitle: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: 'rgba(255,255,255,0.92)',
     textAlign: 'center',
     maxWidth: 320,
+    textShadowColor: 'rgba(0,0,0,0.35)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 6,
   },
   formCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
+    backgroundColor: 'rgba(255, 255, 255, 0.78)',
+    borderRadius: radius.xl,
     padding: spacing.xl,
     borderWidth: 1,
-    borderColor: colors.borderLight,
+    borderColor: 'rgba(255, 255, 255, 0.55)',
     gap: spacing.lg,
-    ...shadows.md,
+    width: '100%',
+    ...shadows.lg,
   },
   footer: {
-    marginTop: spacing.sm,
+    marginTop: spacing.xs,
+    alignItems: 'center',
   },
 });

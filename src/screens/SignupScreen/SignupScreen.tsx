@@ -1,18 +1,14 @@
-import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'expo-router';
 import { Controller, useForm } from 'react-hook-form';
 import { StyleSheet, View } from 'react-native';
 import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
 
-import { AuthFooterLink, AuthScreenLayout } from '@/components/auth';
-import { Button, TextInput } from '@/components/ui';
+import { AuthFooterLink, AuthScreenLayout, PakistanPhoneField } from '@/components/auth';
+import { Button, FadeIn, ProgressBar } from '@/components/ui';
 import { useSignupFlow } from '@/hooks/useSignupFlow';
 import { AUTH_ROUTES } from '@/navigation/routes';
-import { normalizePhoneNumber, phoneFieldSchema } from '@/utils/validation';
-
-const signupPhoneSchema = z.object({
-  phone: phoneFieldSchema,
-});
+import { normalizePakistanPhone, signupPhoneSchema } from '@/utils/validation';
 
 type SignupPhoneForm = z.infer<typeof signupPhoneSchema>;
 
@@ -30,15 +26,14 @@ export function SignupScreen() {
   });
 
   const onSubmit = (values: SignupPhoneForm) => {
-    const normalizedPhone = normalizePhoneNumber(values.phone);
-    setPhone(normalizedPhone);
+    setPhone(normalizePakistanPhone(values.phone));
     router.push(AUTH_ROUTES.signupWizard);
   };
 
   return (
     <AuthScreenLayout
       title="Create your account"
-      subtitle="Enter your phone number to get started."
+      subtitle="Start with your Pakistan mobile number."
       footer={
         <AuthFooterLink
           prompt="Already have an account?"
@@ -47,22 +42,22 @@ export function SignupScreen() {
         />
       }
     >
+      <FadeIn>
+        <View style={styles.progressWrap}>
+          <ProgressBar progress={33} label="Step 1 of 2 · Phone" showPercentage={false} />
+        </View>
+      </FadeIn>
+
       <View style={styles.form}>
         <Controller
           control={control}
           name="phone"
           render={({ field: { onChange, onBlur, value } }) => (
-            <TextInput
-              label="Phone Number"
-              placeholder="+1 415 555 2671"
-              keyboardType="phone-pad"
-              autoComplete="tel"
-              leftIcon="call-outline"
+            <PakistanPhoneField
               value={value}
-              onChangeText={onChange}
+              onChangeText={(text) => onChange(text.replace(/[^\d]/g, '').slice(0, 11))}
               onBlur={onBlur}
               error={errors.phone?.message}
-              hint="Include country code (e.g. +1 for US, +92 for Pakistan)."
             />
           )}
         />
@@ -74,6 +69,9 @@ export function SignupScreen() {
 }
 
 const styles = StyleSheet.create({
+  progressWrap: {
+    marginBottom: 4,
+  },
   form: {
     gap: 20,
   },

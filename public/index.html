@@ -33,6 +33,23 @@
         height: 100%;
         flex: 1;
       }
+      /* Remove browser default black focus outline on form controls */
+      input,
+      textarea,
+      select,
+      button,
+      [contenteditable='true'] {
+        outline: none !important;
+        box-shadow: none !important;
+      }
+      input:focus,
+      textarea:focus,
+      select:focus,
+      button:focus,
+      [contenteditable='true']:focus {
+        outline: none !important;
+        box-shadow: none !important;
+      }
     </style>
   </head>
 

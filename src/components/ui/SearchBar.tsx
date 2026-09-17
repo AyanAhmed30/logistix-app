@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { colors, radius, spacing, typography } from '@/constants/theme';
+import { webNoFocusRing } from '@/utils/web-focus';
 
 type SearchBarProps = {
   value: string;
@@ -24,9 +25,10 @@ export function SearchBar({
         onChangeText={onChangeText}
         placeholder={placeholder}
         placeholderTextColor={colors.textMuted}
-        style={styles.input}
+        style={[styles.input, webNoFocusRing]}
         returnKeyType="search"
         clearButtonMode="never"
+        underlineColorAndroid="transparent"
       />
       {value.length > 0 ? (
         <Pressable

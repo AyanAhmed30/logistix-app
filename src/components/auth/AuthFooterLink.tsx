@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { colors, spacing, typography } from '@/constants/theme';
+import { spacing, typography } from '@/constants/theme';
 
 type AuthFooterLinkProps = {
   prompt: string;
@@ -11,7 +11,7 @@ type AuthFooterLinkProps = {
 export function AuthFooterLink({ prompt, linkLabel, onPress }: AuthFooterLinkProps) {
   return (
     <View style={styles.footer}>
-      <Text style={styles.footerText}>{prompt}</Text>
+      {prompt ? <Text style={styles.footerText}>{prompt}</Text> : null}
       <Pressable accessibilityRole="button" onPress={onPress} hitSlop={8}>
         <Text style={styles.footerLink}>{linkLabel}</Text>
       </Pressable>
@@ -26,13 +26,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexWrap: 'wrap',
     gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.35)',
   },
   footerText: {
     ...typography.bodySmall,
-    color: colors.textSecondary,
+    color: 'rgba(255,255,255,0.95)',
   },
   footerLink: {
     ...typography.label,
-    color: colors.primary,
+    color: '#E6FFFB',
+    fontWeight: '800',
   },
 });

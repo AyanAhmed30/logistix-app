@@ -2,13 +2,17 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { AuthFooterLink, AuthScreenLayout, ErrorBanner } from '@/components/auth';
+import { AuthFooterLink, AuthScreenLayout, ErrorBanner, PakistanPhoneField } from '@/components/auth';
 import { Button, TextInput } from '@/components/ui';
 import { AUTH_ROUTES } from '@/navigation/routes';
 import { colors, spacing, typography } from '@/constants/theme';
 import { completePasswordReset, requestPasswordReset } from '@/services/auth';
 import { getAuthErrorMessage } from '@/utils/auth-errors';
-import { normalizePhoneNumber, passwordFieldSchema } from '@/utils/validation';
+import {
+  extractPakistanLocalDigits,
+  normalizePakistanPhone,
+  passwordFieldSchema,
+} from '@/utils/validation';
 
 type Step = 'identify' | 'password' | 'done';
 
@@ -24,9 +28,9 @@ export function ForgotPasswordScreen() {
   const [loading, setLoading] = useState(false);
 
   const onRequestReset = async () => {
-    const normalized = normalizePhoneNumber(phone);
-    if (normalized.replace(/\D/g, '').length < 10) {
-      setError('Enter a valid phone number with country code.');
+    const local = extractPakistanLocalDigits(phone);
+    if (!/^3\d{9}$/.test(local)) {
+      setError('Enter a valid 10-digit mobile number starting with 3.');
       return;
     }
     if (!email.trim() || !email.includes('@')) {
@@ -36,7 +40,10 @@ export function ForgotPasswordScreen() {
 
     setError(null);
     setLoading(true);
-    const result = await requestPasswordReset(normalized, email.trim().toLowerCase());
+    const result = await requestPasswordReset(
+      normalizePakistanPhone(phone),
+      email.trim().toLowerCase(),
+    );
     setLoading(false);
 
     if (result.error || !result.data) {
@@ -121,12 +128,7 @@ export function ForgotPasswordScreen() {
 
       {step === 'identify' ? (
         <View style={styles.form}>
-          <TextInput
-            label="Phone Number"
-            placeholder="+92 300 1234567"
-            keyboardType="phone-pad"
-            autoComplete="tel"
-            leftIcon="call-outline"
+          <PakistanPhoneField
             value={phone}
             onChangeText={(v) => {
               setPhone(v);
