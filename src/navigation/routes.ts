@@ -12,19 +12,25 @@ export const APP_ROUTES = {
   tabs: '/(tabs)',
   home: '/(tabs)',
   inquiries: '/(tabs)/inquiries',
-  inquiryDrafts: '/(tabs)/inquiries/drafts',
+  /** Drafts live under Requests → Pending → Draft. */
+  inquiryDrafts: '/(tabs)/inquiries?filter=pending&status=draft',
   inquiryNew: '/(tabs)/inquiries/new?mode=new',
   inquiryDraft: (id: string) =>
     `/(tabs)/inquiries/new?mode=edit&draftId=${encodeURIComponent(id)}` as const,
   inquiryDetail: (id: string) => `/(tabs)/inquiries/${id}` as const,
   inquiryQuote: (id: string) => `/(tabs)/inquiries/${id}/quote` as const,
+  inquiryShipment: (id: string) => `/(tabs)/inquiries/${id}/shipment` as const,
   orders: '/(tabs)/orders',
   orderDetail: (id: string) => `/(tabs)/orders/${id}` as const,
+  orderShipment: (id: string) => `/(tabs)/orders/${id}/shipment` as const,
   tracking: '/(tabs)/tracking',
   profile: '/(tabs)/profile',
   profileEdit: '/(tabs)/profile/edit',
   profileSecurity: '/(tabs)/profile/security',
   notifications: '/(tabs)/profile/notifications',
+  documents: '/(tabs)/profile/documents',
+  documentDetail: (id: string, source: 'inquiry' | 'order' = 'inquiry') =>
+    `/(tabs)/profile/documents/${encodeURIComponent(id)}?source=${source}` as const,
   support: '/(tabs)/profile/support',
 } as const;
 

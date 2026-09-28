@@ -42,6 +42,11 @@ export type CustomerInquiry = {
   quoteTotal?: number | null;
   quoteNumber?: string | null;
   quoteSentAt?: string | null;
+  /** Present after quotation acceptance when tracking is added. */
+  shipmentTrackingNumber?: string | null;
+  /** Present after quotation acceptance when parcel photo is uploaded. */
+  shipmentParcelPhotoUrl?: string | null;
+  customerAcceptedAt?: string | null;
 };
 
 export type CustomerPortalData = {

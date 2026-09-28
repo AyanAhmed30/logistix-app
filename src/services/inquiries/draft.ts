@@ -121,7 +121,7 @@ export async function saveCustomerInquiryDraft(
       p_quantity: input.quantity.trim(),
       p_total_weight: input.totalWeight.trim(),
       p_cbm: input.cbm.trim(),
-      p_description: input.description?.trim() || null,
+      p_description: input.description?.trim() || '',
       p_image_url: input.imageUrl?.trim() || null,
       p_additional_image_urls: additional,
       p_draft_step: Math.max(0, Math.floor(input.draftStep) || 0),
@@ -190,7 +190,7 @@ export async function submitCustomerInquiryDraft(
       p_quantity: input.quantity.trim(),
       p_total_weight: input.totalWeight.trim(),
       p_cbm: input.cbm.trim(),
-      p_description: input.description?.trim() || null,
+      p_description: input.description?.trim() || '',
       p_image_url: input.imageUrl?.trim() || null,
       p_additional_image_urls: additional,
     });

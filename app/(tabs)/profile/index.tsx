@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, type Href } from 'expo-router';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { Avatar, Button, MenuListItem, ScreenContainer } from '@/components/ui';
 import { mockCustomer } from '@/data/mock/customer';
@@ -17,6 +17,7 @@ function getInitials(firstName?: string, lastName?: string): string {
 
 const MENU_ROUTES: Record<string, string> = {
   notifications: APP_ROUTES.notifications,
+  documents: APP_ROUTES.documents,
   support: APP_ROUTES.support,
   security: AUTH_ROUTES.forgotPassword,
 };
@@ -26,13 +27,6 @@ export default function ProfileScreen() {
   const { user, signOut } = useAuth();
 
   const handleMenuPress = (id: string) => {
-    if (id === 'documents') {
-      Alert.alert(
-        'Documents',
-        'Open any request or order to see quotes, packing lists, and invoices when available.',
-      );
-      return;
-    }
     const route = MENU_ROUTES[id];
     if (route) {
       router.push(route as Href);
@@ -56,7 +50,6 @@ export default function ProfileScreen() {
         <Avatar initials={getInitials(user?.firstName, user?.lastName)} size="lg" />
         <View style={styles.profileInfo}>
           <Text style={styles.name}>{displayName}</Text>
-          <Text style={styles.role}>{mockCustomer.companyName}</Text>
           <Text style={styles.company}>Customer ID {mockCustomer.customerId}</Text>
         </View>
       </View>
@@ -124,11 +117,6 @@ const styles = StyleSheet.create({
   name: {
     ...typography.h3,
     color: colors.text,
-  },
-  role: {
-    ...typography.bodySmall,
-    color: colors.textSecondary,
-    marginTop: 2,
   },
   company: {
     ...typography.caption,

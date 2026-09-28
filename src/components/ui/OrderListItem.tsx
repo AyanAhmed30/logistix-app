@@ -57,6 +57,12 @@ export function OrderListItem({ order, onPress, compact = false }: OrderListItem
             <Ionicons name="calendar-outline" size={14} color={colors.textMuted} />
             <Text style={styles.metaText}>{order.estimatedDelivery}</Text>
           </View>
+          {order.trackingNumber ? (
+            <View style={styles.metaItem}>
+              <Ionicons name="navigate-outline" size={14} color={colors.textMuted} />
+              <Text style={styles.metaText}>{order.trackingNumber}</Text>
+            </View>
+          ) : null}
         </View>
       ) : null}
     </Pressable>

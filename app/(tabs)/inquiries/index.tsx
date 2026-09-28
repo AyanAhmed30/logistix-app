@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, type Href } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -11,34 +12,45 @@ import {
   View,
 } from 'react-native';
 
-import { RequestsSubNav } from '@/components/inquiry';
+import { DraftRequestCard } from '@/components/inquiry';
 import { EmptyState, FadeIn, FilterChips, ScreenContainer } from '@/components/ui';
-import {
-  matchesRequestFilter,
-  mapInternalToCustomerStatus,
-  REQUEST_FILTER_OPTIONS,
-  RequestFilter,
-} from '@/constants/customer-status';
+import { mapInternalToCustomerStatus } from '@/constants/customer-status';
 import { colors, radius, shadows, spacing, typography } from '@/constants/theme';
 import { mockRequests } from '@/data/mock/customer';
 import { useCustomerPortal } from '@/hooks/useCustomerPortal';
 import { APP_ROUTES, newRequestHref } from '@/navigation/routes';
 import { useAuth } from '@/providers';
+import { listCustomerOrders } from '@/services/orders';
 import { CustomerInquiry } from '@/types/inquiry';
 import { CustomerStatusKey, MockRequest } from '@/types/customer';
 import { getCustomerStatusVisual } from '@/utils/customer-status-ui';
-import { getDraftInquiries, isDraftInquiry } from '@/utils/home-dashboard';
+import { isDraftInquiry } from '@/utils/home-dashboard';
 import { getPortalErrorMessage } from '@/utils/inquiry-portal-errors';
+import {
+  buildRequestsHref,
+  enrichInquiryShipmentFields,
+  matchesMockRequestListFilters,
+  matchesRequestListFilters,
+  parsePendingStatus,
+  parseRequestTab,
+  PENDING_STATUS_OPTIONS,
+  REQUEST_TAB_OPTIONS,
+  type PendingStatusFilter,
+  type RequestTab,
+} from '@/utils/request-lifecycle';
 
-type ListItem = {
-  id: string;
-  title: string;
-  subtitle: string;
-  meta: string;
-  nextStep: string;
-  status: CustomerStatusKey;
-  source: 'live' | 'demo';
-};
+type ListRow =
+  | { kind: 'draft'; inquiry: CustomerInquiry }
+  | {
+      kind: 'request';
+      id: string;
+      title: string;
+      subtitle: string;
+      meta: string;
+      nextStep: string;
+      status: CustomerStatusKey;
+      source: 'live' | 'demo';
+    };
 
 function formatRequestCargoMeta(input: {
   quantity?: string | null;
@@ -52,7 +64,7 @@ function formatRequestCargoMeta(input: {
   return parts.join(' · ') || 'Details pending';
 }
 
-function liveToListItem(inquiry: CustomerInquiry): ListItem {
+function liveToRequestRow(inquiry: CustomerInquiry): ListRow {
   const status = mapInternalToCustomerStatus({
     status: inquiry.status,
     sentAt: inquiry.sentAt,
@@ -61,6 +73,7 @@ function liveToListItem(inquiry: CustomerInquiry): ListItem {
     hasQuote: inquiry.hasQuote,
   });
   return {
+    kind: 'request',
     id: inquiry.id,
     title: inquiry.productName?.trim() || 'Freight request',
     subtitle: inquiry.inquiryNumber,
@@ -75,8 +88,9 @@ function liveToListItem(inquiry: CustomerInquiry): ListItem {
   };
 }
 
-function mockToListItem(request: MockRequest): ListItem {
+function mockToRequestRow(request: MockRequest): ListRow {
   return {
+    kind: 'request',
     id: request.id,
     title: request.productName,
     subtitle: request.requestNumber,
@@ -91,50 +105,124 @@ function mockToListItem(request: MockRequest): ListItem {
   };
 }
 
+function emptyCopy(tab: RequestTab, pendingStatus: PendingStatusFilter) {
+  if (tab === 'finalized') {
+    return {
+      title: 'No finalized requests',
+      description:
+        'When tracking and a parcel photo are both added, the request moves here as an order-ready item.',
+    };
+  }
+  if (tab === 'pending') {
+    if (pendingStatus === 'draft') {
+      return {
+        title: 'No drafts yet',
+        description: 'Save a request as a draft when you do not have all the details yet.',
+      };
+    }
+    if (pendingStatus === 'sent') {
+      return {
+        title: 'Nothing sent yet',
+        description: 'Submitted requests waiting for a quotation appear here.',
+      };
+    }
+    if (pendingStatus === 'quotation_received') {
+      return {
+        title: 'No quotations yet',
+        description: 'When your agent sends a quotation, it will show up here.',
+      };
+    }
+    return {
+      title: 'Nothing pending',
+      description: 'Drafts, sent requests, and quotations you still need to act on appear here.',
+    };
+  }
+  return {
+    title: 'No requests yet',
+    description: 'Create a new freight request to get started.',
+  };
+}
+
 export default function InquiriesScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ filter?: string; status?: string }>();
   const { sessionToken } = useAuth();
   const { data, isLoading, isError, error, refetch, isRefetching } = useCustomerPortal(sessionToken);
-  const [filter, setFilter] = useState<RequestFilter>('all');
 
-  const leadSummary = useMemo(() => {
-    if (!data?.leads.length) return null;
-    const primaryLead = data.leads[0];
-    return {
-      name: primaryLead.name,
-      leadNumber: primaryLead.leadNumber,
-      totalLeads: data.leads.length,
-    };
-  }, [data?.leads]);
-
-  const liveInquiries = data?.inquiries ?? [];
-  const draftItems = useMemo(() => getDraftInquiries(liveInquiries), [liveInquiries]);
-  const submittedInquiries = useMemo(
-    () => liveInquiries.filter((inquiry) => !isDraftInquiry(inquiry)),
-    [liveInquiries],
+  const [tab, setTab] = useState<RequestTab>(() => parseRequestTab(params.filter));
+  const [pendingStatus, setPendingStatus] = useState<PendingStatusFilter>(() =>
+    parsePendingStatus(params.status, params.filter),
   );
-  // Demo samples only in development — never in production empty states (Step 2 P0).
-  const usingDemo = __DEV__ && !isLoading && !isError && submittedInquiries.length === 0 && draftItems.length === 0;
 
-  const items = useMemo(() => {
-    const sourceItems = usingDemo
-      ? mockRequests.map(mockToListItem)
-      : submittedInquiries.map(liveToListItem);
+  useEffect(() => {
+    setTab(parseRequestTab(params.filter));
+    setPendingStatus(parsePendingStatus(params.status, params.filter));
+  }, [params.filter, params.status]);
 
-    return sourceItems.filter((item) => matchesRequestFilter(item.status, filter));
-  }, [filter, submittedInquiries, usingDemo]);
+  const ordersQuery = useQuery({
+    queryKey: ['customer-orders', sessionToken],
+    enabled: Boolean(sessionToken),
+    staleTime: 30_000,
+    queryFn: async () => {
+      const result = await listCustomerOrders(sessionToken!);
+      if (result.error) throw result.error;
+      return result.data ?? [];
+    },
+  });
+
+  const hasLinkedCustomer = Boolean(data?.leads.length);
+  const liveInquiries = data?.inquiries ?? [];
+
+  const enrichedInquiries = useMemo(() => {
+    const byInquiryId = new Map<
+      string,
+      { trackingNumber?: string | null; parcelPhotoUrl?: string | null; hasQuote?: boolean }
+    >();
+    for (const order of ordersQuery.data ?? []) {
+      if (!order.inquiryId) continue;
+      byInquiryId.set(order.inquiryId, {
+        trackingNumber: order.trackingNumber,
+        parcelPhotoUrl: order.parcelPhotoUrl,
+        hasQuote: true,
+      });
+    }
+    return liveInquiries.map((inquiry) =>
+      enrichInquiryShipmentFields(inquiry, byInquiryId.get(inquiry.id)),
+    );
+  }, [liveInquiries, ordersQuery.data]);
+
+  const usingDemo =
+    __DEV__ &&
+    !isLoading &&
+    !isError &&
+    enrichedInquiries.length === 0;
+
+  const rows = useMemo((): ListRow[] => {
+    if (usingDemo) {
+      return mockRequests
+        .filter((request) => matchesMockRequestListFilters(request.status, tab, pendingStatus))
+        .map(mockToRequestRow);
+    }
+
+    return enrichedInquiries
+      .filter((inquiry) => matchesRequestListFilters(inquiry, tab, pendingStatus))
+      .map((inquiry) =>
+        isDraftInquiry(inquiry) ? { kind: 'draft' as const, inquiry } : liveToRequestRow(inquiry),
+      );
+  }, [enrichedInquiries, pendingStatus, tab, usingDemo]);
+
+  const refreshing = isRefetching || ordersQuery.isRefetching;
+  const onRefresh = () => {
+    void refetch();
+    void ordersQuery.refetch();
+  };
+
+  const empty = emptyCopy(tab, pendingStatus);
 
   return (
     <ScreenContainer
       scrollable={false}
       title="Requests"
-      subtitle={
-        leadSummary
-          ? `Lead #${leadSummary.leadNumber ?? '—'} · ${submittedInquiries.length} request${submittedInquiries.length === 1 ? '' : 's'}`
-          : usingDemo
-            ? 'Demo requests for exploration'
-            : 'Freight requests linked to your phone'
-      }
       showNotificationBell
       headerRight={
         <Pressable
@@ -162,58 +250,44 @@ export default function InquiriesScreen() {
         />
       ) : (
         <View style={styles.body}>
-          <RequestsSubNav active="requests" />
           <FilterChips
-            chips={REQUEST_FILTER_OPTIONS}
-            selectedId={filter}
-            onSelect={(id) => setFilter(id as RequestFilter)}
+            variant="segmented"
+            chips={REQUEST_TAB_OPTIONS}
+            selectedId={tab}
+            onSelect={(id) => {
+              const next = id as RequestTab;
+              setTab(next);
+              if (next !== 'pending') setPendingStatus('all');
+              router.replace(buildRequestsHref(next, next === 'pending' ? pendingStatus : 'all') as Href);
+            }}
           />
+
+          {tab === 'pending' ? (
+            <View style={styles.statusBlock}>
+              <Text style={styles.statusLabel}>Status</Text>
+              <FilterChips
+                chips={PENDING_STATUS_OPTIONS}
+                selectedId={pendingStatus}
+                onSelect={(id) => {
+                  const next = id as PendingStatusFilter;
+                  setPendingStatus(next);
+                  router.replace(buildRequestsHref('pending', next) as Href);
+                }}
+              />
+            </View>
+          ) : null}
 
           <ScrollView
             showsVerticalScrollIndicator={false}
             refreshControl={
               <RefreshControl
-                refreshing={isRefetching}
-                onRefresh={() => refetch()}
+                refreshing={refreshing}
+                onRefresh={onRefresh}
                 tintColor={colors.primary}
               />
             }
             contentContainerStyle={styles.scrollContent}
           >
-            {leadSummary ? (
-              <FadeIn>
-                <View style={styles.leadCard}>
-                  <Text style={styles.leadLabel}>Your lead</Text>
-                  <Text style={styles.leadName}>{leadSummary.name || 'Customer'}</Text>
-                  <Text style={styles.leadMeta}>Lead #{leadSummary.leadNumber ?? '—'}</Text>
-                  {leadSummary.totalLeads > 1 ? (
-                    <Text style={styles.leadNote}>
-                      {leadSummary.totalLeads} leads matched your phone number.
-                    </Text>
-                  ) : null}
-                </View>
-              </FadeIn>
-            ) : null}
-
-            {draftItems.length > 0 ? (
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => router.push(APP_ROUTES.inquiryDrafts as Href)}
-                style={({ pressed }) => [styles.draftBanner, pressed && { opacity: 0.92 }]}
-              >
-                <View style={styles.draftBannerText}>
-                  <Text style={styles.draftHeading}>Draft Requests</Text>
-                  <Text style={styles.draftHint}>
-                    {draftItems.length === 1
-                      ? '1 draft waiting to be finished'
-                      : `${draftItems.length} drafts waiting to be finished`}
-                  </Text>
-                </View>
-                <Text style={styles.viewLink}>View</Text>
-                <Ionicons name="chevron-forward" size={16} color={colors.accent} />
-              </Pressable>
-            ) : null}
-
             {usingDemo ? (
               <View style={styles.demoBanner}>
                 <Ionicons name="sparkles-outline" size={16} color={colors.accentDark} />
@@ -223,42 +297,52 @@ export default function InquiriesScreen() {
               </View>
             ) : null}
 
-            {items.length === 0 && (usingDemo || draftItems.length === 0) ? (
+            {rows.length === 0 ? (
               <EmptyState
                 icon="document-text-outline"
-                title={usingDemo ? 'No demo matches' : 'No submitted requests'}
+                title={usingDemo ? 'No demo matches' : empty.title}
                 description={
                   usingDemo
-                    ? 'Try another filter, or create a new request to explore the flow.'
-                    : leadSummary
-                      ? draftItems.length > 0
-                        ? 'You have drafts above. Submitted requests will appear here.'
-                        : 'When your sales agent sends freight requests for your lead, they will appear here.'
-                      : 'No lead was found for your phone yet. Ask your sales agent to confirm the lead phone matches your account. Pull down to refresh.'
+                    ? 'Try another filter, or create a new request.'
+                    : hasLinkedCustomer
+                      ? empty.description
+                      : 'No customer profile was found for your phone yet. Ask your sales agent to confirm the phone matches your account.'
                 }
                 actionLabel="New request"
                 onActionPress={() => router.push(newRequestHref() as Href)}
               />
             ) : (
               <View style={styles.list}>
-                {items.map((item, index) => {
-                  const visual = getCustomerStatusVisual(item.status);
+                {rows.map((row, index) => {
+                  if (row.kind === 'draft') {
+                    return (
+                      <FadeIn key={row.inquiry.id} delay={index * 40}>
+                        <DraftRequestCard
+                          draft={row.inquiry}
+                          onContinue={() =>
+                            router.push(APP_ROUTES.inquiryDraft(row.inquiry.id) as Href)
+                          }
+                        />
+                      </FadeIn>
+                    );
+                  }
+
+                  const visual = getCustomerStatusVisual(row.status);
                   return (
-                    <FadeIn key={item.id} delay={index * 40}>
+                    <FadeIn key={row.id} delay={index * 40}>
                       <Pressable
                         accessibilityRole="button"
-                        onPress={() => router.push(APP_ROUTES.inquiryDetail(item.id) as Href)}
+                        onPress={() => router.push(APP_ROUTES.inquiryDetail(row.id) as Href)}
                         style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
                       >
                         <View style={styles.cardTop}>
                           <View style={styles.cardTitles}>
                             <Text style={styles.cardTitle} numberOfLines={2}>
-                              {item.title}
+                              {row.title}
                             </Text>
-                            <Text style={styles.cardSubtitle}>
-                              {item.subtitle}
-                              {item.source === 'demo' ? ' · Demo' : ''}
-                            </Text>
+                            {row.source === 'demo' ? (
+                              <Text style={styles.cardSubtitle}>Demo</Text>
+                            ) : null}
                           </View>
                           <View
                             style={[styles.badge, { backgroundColor: visual.backgroundColor }]}
@@ -268,9 +352,9 @@ export default function InquiriesScreen() {
                             </Text>
                           </View>
                         </View>
-                        <Text style={styles.cardMeta}>{item.meta}</Text>
+                        <Text style={styles.cardMeta}>{row.meta}</Text>
                         <Text style={styles.cardNext} numberOfLines={2}>
-                          {item.nextStep}
+                          {row.nextStep}
                         </Text>
                         <View style={styles.cardFooter}>
                           <Text style={styles.viewLink}>View details</Text>
@@ -314,6 +398,18 @@ const styles = StyleSheet.create({
   body: {
     flex: 1,
     gap: spacing.md,
+    minWidth: 0,
+  },
+  statusBlock: {
+    gap: spacing.xs,
+    flexShrink: 0,
+  },
+  statusLabel: {
+    ...typography.caption,
+    fontWeight: '700',
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
   },
   scrollContent: {
     gap: spacing.lg,
@@ -326,34 +422,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  leadCard: {
-    backgroundColor: colors.primaryLight,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    gap: spacing.xs,
-  },
-  leadLabel: {
-    ...typography.caption,
-    color: colors.primary,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
-  leadName: {
-    ...typography.h3,
-    color: colors.text,
-  },
-  leadMeta: {
-    ...typography.bodySmall,
-    color: colors.textSecondary,
-  },
-  leadNote: {
-    ...typography.caption,
-    color: colors.textMuted,
-    marginTop: spacing.xs,
   },
   demoBanner: {
     flexDirection: 'row',
@@ -372,31 +440,6 @@ const styles = StyleSheet.create({
   },
   list: {
     gap: spacing.md,
-  },
-  draftBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    ...shadows.sm,
-  },
-  draftBannerText: {
-    flex: 1,
-    minWidth: 0,
-    gap: 2,
-  },
-  draftHeading: {
-    ...typography.label,
-    color: colors.text,
-    fontSize: 15,
-  },
-  draftHint: {
-    ...typography.bodySmall,
-    color: colors.textSecondary,
   },
   card: {
     backgroundColor: colors.surface,

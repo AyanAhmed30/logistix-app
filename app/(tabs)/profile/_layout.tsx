@@ -7,6 +7,7 @@ export default function ProfileLayout() {
       <Stack.Screen name="edit" />
       <Stack.Screen name="security" />
       <Stack.Screen name="notifications" />
+      <Stack.Screen name="documents" />
       <Stack.Screen name="support" />
     </Stack>
   );

@@ -36,6 +36,7 @@ yarn-error.*
 !.env.example
 supabase/.env
 supabase/.env.*
+supabase/.temp/
 
 # Credentials & signing keys
 credentials.json

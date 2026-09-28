@@ -140,7 +140,7 @@ export default function RequestDetailScreen() {
       ) : null}
 
       {inquiry.leadNumber ? (
-        <Text style={styles.leadMeta}>Lead #{inquiry.leadNumber}</Text>
+        <Text style={styles.leadMeta}>Customer ID {inquiry.leadNumber}</Text>
       ) : null}
 
       <FadeIn>

@@ -34,6 +34,11 @@ export type CustomerQuote = {
   canNegotiate: boolean;
   canAccept: boolean;
   canDecline: boolean;
+  customerAcceptedAt: string | null;
+  shipmentTrackingNumber: string | null;
+  shipmentParcelPhotoUrl: string | null;
+  shipmentStatus: string | null;
+  canAddShipmentInfo: boolean;
   history: NegotiationHistoryItem[];
 };
 
@@ -159,6 +164,19 @@ function mapPayload(
     canNegotiate: Boolean(payload.can_negotiate),
     canAccept: Boolean(payload.can_accept),
     canDecline: Boolean(payload.can_decline),
+    customerAcceptedAt: payload.customer_accepted_at
+      ? String(payload.customer_accepted_at)
+      : null,
+    shipmentTrackingNumber: payload.shipment_tracking_number
+      ? String(payload.shipment_tracking_number)
+      : null,
+    shipmentParcelPhotoUrl: payload.shipment_parcel_photo_url
+      ? String(payload.shipment_parcel_photo_url)
+      : null,
+    shipmentStatus: payload.shipment_status
+      ? String(payload.shipment_status)
+      : null,
+    canAddShipmentInfo: Boolean(payload.can_add_shipment_info),
     history: mapHistory(payload.history),
   };
 }

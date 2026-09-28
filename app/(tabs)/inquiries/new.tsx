@@ -486,6 +486,8 @@ export default function NewRequestScreen() {
     }
 
     await queryClient.invalidateQueries({ queryKey: ['customer-portal'] });
+    await queryClient.invalidateQueries({ queryKey: ['customer-notifications'] });
+    await queryClient.invalidateQueries({ queryKey: ['customer-notifications-unread'] });
 
     setSuccess({
       inquiryId: result.data.inquiryId,
@@ -538,7 +540,7 @@ export default function NewRequestScreen() {
           <View style={styles.form}>
             <ErrorBanner message="This draft is no longer available." />
             <Button
-              label="Back to Draft Requests"
+              label="Back to drafts"
               fullWidth
               onPress={() => router.replace(APP_ROUTES.inquiryDrafts as Href)}
             />
@@ -653,20 +655,6 @@ export default function NewRequestScreen() {
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Notes</Text>
-            <TextInput
-              label="Other details (optional)"
-              placeholder="Packaging notes, HS hints, special handling…"
-              value={form.notes}
-              onChangeText={(v) => update('notes', v)}
-              multiline
-              hint="You can leave this blank and still submit."
-            />
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Review</Text>
-
             <View style={styles.attachCard}>
               <Text style={styles.attachTitle}>Attachments (optional)</Text>
               <Text style={styles.attachHint}>
@@ -730,6 +718,22 @@ export default function NewRequestScreen() {
                 </View>
               ) : null}
             </View>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Notes</Text>
+            <TextInput
+              label="Other details (optional)"
+              placeholder="Packaging notes, HS hints, special handling…"
+              value={form.notes}
+              onChangeText={(v) => update('notes', v)}
+              multiline
+              hint="You can leave this blank and still submit."
+            />
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Review</Text>
 
             <View style={styles.reviewCard}>
               <Text style={styles.reviewTitle}>Inquiry summary</Text>
@@ -763,10 +767,7 @@ export default function NewRequestScreen() {
                 </View>
               </View>
 
-              <Text style={styles.reviewHint}>
-                This uses the same cargo fields as CRM Sales inquiries. Your sales agent will
-                review and forward to Operations.
-              </Text>
+              
             </View>
           </View>
         </View>

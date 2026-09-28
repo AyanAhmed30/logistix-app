@@ -3,13 +3,8 @@ import { useRouter, type Href } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors, radius, typography } from '@/constants/theme';
-import { mockNotifications } from '@/data/mock/customer';
+import { useCustomerUnreadNotificationCount } from '@/hooks/useCustomerNotifications';
 import { APP_ROUTES } from '@/navigation/routes';
-
-/** Unread count from the same notification source used by Profile → Notifications. */
-export function getUnreadNotificationCount(): number {
-  return mockNotifications.filter((item) => !item.read).length;
-}
 
 type Props = {
   /** Compact size for dense headers that already have another action. */
@@ -17,12 +12,12 @@ type Props = {
 };
 
 /**
- * Header notification bell that opens the existing notifications screen.
- * Reuses mock/live notification data already shown under Profile.
+ * Header notification bell with live unread badge.
+ * Opens Profile → Notifications.
  */
 export function NotificationBellButton({ size = 'default' }: Props) {
   const router = useRouter();
-  const unread = getUnreadNotificationCount();
+  const { data: unread = 0 } = useCustomerUnreadNotificationCount();
   const iconSize = size === 'compact' ? 20 : 22;
   const box = size === 'compact' ? 36 : 40;
 
@@ -30,9 +25,7 @@ export function NotificationBellButton({ size = 'default' }: Props) {
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={
-        unread > 0
-          ? `Notifications, ${unread} unread`
-          : 'Notifications'
+        unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'
       }
       onPress={() => router.push(APP_ROUTES.notifications as Href)}
       hitSlop={8}
@@ -50,6 +43,11 @@ export function NotificationBellButton({ size = 'default' }: Props) {
       ) : null}
     </Pressable>
   );
+}
+
+/** @deprecated Prefer useCustomerUnreadNotificationCount hook. */
+export function getUnreadNotificationCount(): number {
+  return 0;
 }
 
 const styles = StyleSheet.create({

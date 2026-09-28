@@ -11,6 +11,8 @@ export type Order = {
   weight: string;
   estimatedDelivery: string;
   createdAt: string;
+  /** Optional tracking number shown in the list card footer. */
+  trackingNumber?: string | null;
 };
 
 export type DashboardStat = {

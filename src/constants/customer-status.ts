@@ -105,15 +105,6 @@ export const CUSTOMER_STATUS_CONFIG: Record<CustomerStatus, CustomerStatusConfig
   },
 };
 
-export type RequestFilter = 'all' | 'active' | 'action_needed' | 'completed';
-
-export const REQUEST_FILTER_OPTIONS: Array<{ id: RequestFilter; label: string }> = [
-  { id: 'all', label: 'All' },
-  { id: 'active', label: 'Active' },
-  { id: 'action_needed', label: 'Action needed' },
-  { id: 'completed', label: 'Completed' },
-];
-
 /**
  * Map internal lead_inquiries.status (+ optional signals) → customer status.
  */
@@ -142,14 +133,4 @@ export function mapInternalToCustomerStatus(input: {
 
 export function getCustomerStatusConfig(status: CustomerStatus): CustomerStatusConfig {
   return CUSTOMER_STATUS_CONFIG[status];
-}
-
-export function matchesRequestFilter(
-  customerStatus: CustomerStatus,
-  filter: RequestFilter,
-): boolean {
-  if (filter === 'all') return true;
-  const bucket = CUSTOMER_STATUS_CONFIG[customerStatus].filterBucket;
-  if (filter === 'active') return bucket === 'active' || bucket === 'action_needed';
-  return bucket === filter;
 }

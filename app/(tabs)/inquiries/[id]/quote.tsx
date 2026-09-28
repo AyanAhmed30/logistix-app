@@ -1,11 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Linking,
-  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -19,16 +17,12 @@ import {
   FadeIn,
   ScreenContainer,
   SectionHeader,
-  TextInput,
 } from '@/components/ui';
 import { colors, radius, spacing, typography } from '@/constants/theme';
 import { APP_ROUTES } from '@/navigation/routes';
 import { useAuth } from '@/providers';
 import {
-  acceptCustomerQuotation,
-  declineCustomerQuotation,
   fetchCustomerQuoteBySession,
-  submitQuotationNegotiation,
   type NegotiationHistoryItem,
 } from '@/services/inquiries';
 
@@ -79,25 +73,25 @@ function statusBanner(status: string): { title: string; body: string; tone: 'inf
     case 'awaiting_customer':
       return {
         title: 'Your Response Required',
-        body: 'Sales sent an updated offer. Review the latest PDF and accept, negotiate again, or decline.',
+        body: 'Sales sent an updated offer. Review the latest PDF and accept if you are ready.',
         tone: 'info',
       };
     case 'accepted':
       return {
         title: 'Quotation Accepted',
-        body: 'You accepted this offer. Logistix Sales has been notified.',
+        body: 'You accepted this offer. Add tracking information from Orders if you have not already.',
         tone: 'ok',
       };
     case 'declined':
       return {
         title: 'Quotation Declined',
-        body: 'You declined this quotation. Sales has been notified.',
+        body: 'This quotation was declined previously.',
         tone: 'bad',
       };
     default:
       return {
         title: 'Quotation ready',
-        body: 'Review the offer, open the PDF, then accept, negotiate, or decline.',
+        body: 'Review the offer, open the PDF, then accept when you are ready.',
         tone: 'info',
       };
   }
@@ -134,16 +128,9 @@ function historyAmount(item: NegotiationHistoryItem): string {
 
 export default function InquiryQuoteScreen() {
   const router = useRouter();
-  const queryClient = useQueryClient();
   const { sessionToken } = useAuth();
   const { id } = useLocalSearchParams<{ id: string }>();
   const inquiryId = Array.isArray(id) ? id[0] : id;
-
-  const [negotiateOpen, setNegotiateOpen] = useState(false);
-  const [declineOpen, setDeclineOpen] = useState(false);
-  const [requestedAmount, setRequestedAmount] = useState('');
-  const [negotiateMessage, setNegotiateMessage] = useState('');
-  const [declineReason, setDeclineReason] = useState('');
 
   const { data, isLoading, isError, error, refetch, isRefetching } = useQuery({
     queryKey: ['customer-quote', sessionToken, inquiryId],
@@ -154,71 +141,6 @@ export default function InquiryQuoteScreen() {
         throw result.error || new Error('quote_not_available');
       }
       return result.data;
-    },
-  });
-
-  const invalidate = async () => {
-    await queryClient.invalidateQueries({
-      queryKey: ['customer-quote', sessionToken, inquiryId],
-    });
-    await queryClient.invalidateQueries({ queryKey: ['customer-portal'] });
-  };
-
-  const negotiateMutation = useMutation({
-    mutationFn: async () => {
-      const amount = Number(requestedAmount);
-      if (!(amount > 0)) throw new Error('invalid_requested_amount');
-      const result = await submitQuotationNegotiation(
-        sessionToken!,
-        inquiryId!,
-        amount,
-        negotiateMessage,
-      );
-      if ('error' in result) throw result.error;
-    },
-    onSuccess: async () => {
-      setNegotiateOpen(false);
-      setRequestedAmount('');
-      setNegotiateMessage('');
-      await invalidate();
-      Alert.alert('Request sent', 'Sales will review your negotiation request.');
-    },
-    onError: (err) => {
-      Alert.alert('Unable to negotiate', getQuoteErrorMessage(err));
-    },
-  });
-
-  const acceptMutation = useMutation({
-    mutationFn: async () => {
-      const result = await acceptCustomerQuotation(sessionToken!, inquiryId!);
-      if ('error' in result) throw result.error;
-    },
-    onSuccess: async () => {
-      await invalidate();
-      Alert.alert('Accepted', 'You accepted this quotation. Sales has been notified.');
-    },
-    onError: (err) => {
-      Alert.alert('Unable to accept', getQuoteErrorMessage(err));
-    },
-  });
-
-  const declineMutation = useMutation({
-    mutationFn: async () => {
-      const result = await declineCustomerQuotation(
-        sessionToken!,
-        inquiryId!,
-        declineReason,
-      );
-      if ('error' in result) throw result.error;
-    },
-    onSuccess: async () => {
-      setDeclineOpen(false);
-      setDeclineReason('');
-      await invalidate();
-      Alert.alert('Declined', 'You declined this quotation. Sales has been notified.');
-    },
-    onError: (err) => {
-      Alert.alert('Unable to decline', getQuoteErrorMessage(err));
     },
   });
 
@@ -356,42 +278,25 @@ export default function InquiryQuoteScreen() {
         />
         {data.canAccept ? (
           <Button
-            label={`Accept ${formatMoney(data.totalAmount)}`}
+            label="Accept"
             fullWidth
-            loading={acceptMutation.isPending}
-            onPress={() => {
-              Alert.alert(
-                'Accept quotation',
-                `Accept ${formatMoney(data.totalAmount)} for ${data.quotationNumber}?`,
-                [
-                  { text: 'Cancel', style: 'cancel' },
-                  {
-                    text: 'Accept',
-                    onPress: () => acceptMutation.mutate(),
-                  },
-                ],
-              );
-            }}
+            onPress={() =>
+              router.push(APP_ROUTES.inquiryShipment(inquiryId || '') as Href)
+            }
           />
         ) : null}
-        {data.canNegotiate ? (
+        {data.status === 'accepted' && data.canAddShipmentInfo ? (
           <Button
-            label="Negotiate"
+            label={
+              data.shipmentStatus === 'accepted_pending'
+                ? 'Add Tracking Information'
+                : 'Update Shipment Information'
+            }
+            fullWidth
             variant="outline"
-            fullWidth
-            onPress={() => {
-              setRequestedAmount('');
-              setNegotiateMessage('');
-              setNegotiateOpen(true);
-            }}
-          />
-        ) : null}
-        {data.canDecline ? (
-          <Button
-            label="Decline"
-            variant="danger"
-            fullWidth
-            onPress={() => setDeclineOpen(true)}
+            onPress={() =>
+              router.push(APP_ROUTES.inquiryShipment(inquiryId || '') as Href)
+            }
           />
         ) : null}
         <Button
@@ -402,72 +307,6 @@ export default function InquiryQuoteScreen() {
         />
         <Button label="Refresh" variant="ghost" fullWidth onPress={() => refetch()} />
       </View>
-
-      <Modal visible={negotiateOpen} animationType="slide" transparent>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Negotiate quotation</Text>
-            <Text style={styles.modalBody}>
-              Current quotation: {formatMoney(data.totalAmount)}. Enter the amount you
-              would like Sales to consider. You cannot change quotation lines directly.
-            </Text>
-            <TextInput
-              label="Requested amount"
-              value={requestedAmount}
-              onChangeText={setRequestedAmount}
-              keyboardType="decimal-pad"
-              placeholder="e.g. 1650"
-            />
-            <TextInput
-              label="Message"
-              value={negotiateMessage}
-              onChangeText={setNegotiateMessage}
-              placeholder="Can you provide a better rate?"
-              multiline
-            />
-            <Button
-              label="Send Negotiation Request"
-              fullWidth
-              loading={negotiateMutation.isPending}
-              onPress={() => negotiateMutation.mutate()}
-            />
-            <Button
-              label="Cancel"
-              variant="ghost"
-              fullWidth
-              onPress={() => setNegotiateOpen(false)}
-            />
-          </View>
-        </View>
-      </Modal>
-
-      <Modal visible={declineOpen} animationType="slide" transparent>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Decline quotation</Text>
-            <TextInput
-              label="Reason (optional)"
-              value={declineReason}
-              onChangeText={setDeclineReason}
-              placeholder="Price is too high"
-              multiline
-            />
-            <Button
-              label="Decline quotation"
-              variant="danger"
-              fullWidth
-              loading={declineMutation.isPending}
-              onPress={() => declineMutation.mutate()}
-            />
-            <Button
-              label="Cancel"
-              variant="ghost"
-              fullWidth
-              onPress={() => setDeclineOpen(false)}
-            />
-          </View>
-        </View>
-      </Modal>
     </ScreenContainer>
   );
 }
@@ -598,25 +437,5 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     marginTop: spacing.xl,
     marginBottom: spacing.huge,
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: colors.overlay,
-    justifyContent: 'flex-end',
-  },
-  modalCard: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    padding: spacing.xxl,
-    gap: spacing.md,
-  },
-  modalTitle: {
-    ...typography.h3,
-    color: colors.text,
-  },
-  modalBody: {
-    ...typography.bodySmall,
-    color: colors.textSecondary,
   },
 });

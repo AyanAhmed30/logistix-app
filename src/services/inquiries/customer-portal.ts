@@ -47,6 +47,9 @@ type RpcInquiryRow = {
   quote_total?: number | string | null;
   quote_number?: string | null;
   quote_sent_at?: string | null;
+  shipment_tracking_number?: string | null;
+  shipment_parcel_photo_url?: string | null;
+  customer_accepted_at?: string | null;
 };
 
 type RpcResponse = {
@@ -100,6 +103,13 @@ function toInquiry(row: RpcInquiryRow): CustomerInquiry {
         : Number(row.quote_total),
     quoteNumber: row.quote_number ?? null,
     quoteSentAt: row.quote_sent_at ?? null,
+    shipmentTrackingNumber: row.shipment_tracking_number?.trim()
+      ? String(row.shipment_tracking_number).trim()
+      : null,
+    shipmentParcelPhotoUrl: row.shipment_parcel_photo_url?.trim()
+      ? String(row.shipment_parcel_photo_url).trim()
+      : null,
+    customerAcceptedAt: row.customer_accepted_at ?? null,
   };
 }
 
